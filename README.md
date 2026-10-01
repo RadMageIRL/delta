@@ -6,6 +6,8 @@ It is a plain HTML page with no build step and no server. I open `delta/index.ht
 
 That storage is the only copy, so use **Export** now and then to keep a JSON backup.
 
+![Delta v1.0 comparing a mock Cisco Catalyst 2960-X config before and after a voice VLAN change](screenshots/delta-v1.0-clean-room-demo.png)
+
 ## What it is
 
 - Line-level diff with word- and character-level highlighting inside changed lines, in **Split** or **Unified** view
