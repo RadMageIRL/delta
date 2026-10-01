@@ -1,0 +1,577 @@
+    :root {
+      --bg: #f5f4ef;
+      --surface: #fffefa;
+      --surface-raised: #ffffff;
+      --text: #1c201d;
+      --muted: #6b716c;
+      --border: #cbd0c9;
+      --accent: #2b6b4d;
+      --accent-ink: #ffffff;
+      --danger: #b83b31;
+      --flash: #2b6bd6;
+      --flag: #b8860b;
+      /* Additions are their own token so a theme can color them apart from the UI accent;
+         light and dark keep them the same, Vegas needs green beside its hot-pink accent. */
+      --add: var(--accent);
+      /* Syntax token colors -- deliberately distinct from --danger/
+         --add/--flash/--flag above, since those already carry diff
+         meaning (del/add/link/bookmark) in this same view; reusing one
+         for a token color would make e.g. a keyword inside an
+         unchanged line look like part of a deletion. */
+      --syn-comment: var(--muted);
+      --syn-string: #0e7c86;
+      --syn-keyword: #7139b0;
+      --syn-number: #b3620c;
+      --syn-func: #af3a7f;
+      --shadow: 0 10px 24px rgba(30, 36, 31, .08);
+      --code-font-size: 12.5px;
+      /* Second accent: only Vegas sets it apart from --accent (neon cyan beside hot pink). */
+      --accent-2: var(--accent);
+      --gold: var(--flag);
+    }
+    /* Dark tokens are declared twice on purpose: once for the system default (when no explicit
+       choice is stored) and once for an explicit [data-theme="dark"] so the toggle wins both ways.
+       :not([data-theme]) rather than :not(light), which would also match "vegas" and, being more
+       specific, override its neon tokens on dark-mode systems. */
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme]) {
+        --bg: #101311;
+        --surface: #181d19;
+        --surface-raised: #202620;
+        --text: #e4e9e2;
+        --muted: #98a198;
+        --border: #364038;
+        --accent: #8cd3a0;
+        --accent-ink: #102416;
+        --danger: #ff9488;
+        --flash: #6db4ff;
+        --flag: #e0b23d;
+        --syn-comment: var(--muted);
+        --syn-string: #5fd0da;
+        --syn-keyword: #c3a6f2;
+        --syn-number: #e8a55c;
+        --syn-func: #f0a3cf;
+        --shadow: 0 12px 28px rgba(0, 0, 0, .26);
+      }
+    }
+    [data-theme="light"] { color-scheme: light; }
+    [data-theme="dark"] {
+      color-scheme: dark;
+      --bg: #101311;
+      --surface: #181d19;
+      --surface-raised: #202620;
+      --text: #e4e9e2;
+      --muted: #98a198;
+      --border: #364038;
+      --accent: #8cd3a0;
+      --accent-ink: #102416;
+      --danger: #ff9488;
+      --flash: #6db4ff;
+      --flag: #e0b23d;
+      --syn-comment: var(--muted);
+      --syn-string: #5fd0da;
+      --syn-keyword: #c3a6f2;
+      --syn-number: #e8a55c;
+      --syn-func: #f0a3cf;
+      --shadow: 0 12px 28px rgba(0, 0, 0, .26);
+    }
+    /* Vegas: an opt-in neon theme on the Theme button, the same palette as Kard's. It redefines
+       the same tokens, then the [data-theme="vegas"] rules near the end add the glow, flicker
+       and marquee-bulb extras. */
+    [data-theme="vegas"] {
+      color-scheme: dark;
+      --bg: #0b0714;
+      --surface: #140c22;
+      --surface-raised: #1c1130;
+      --text: #fdf1ff;
+      --muted: #b69dca;
+      --border: #43285f;
+      --accent: #ff3ea5;
+      --accent-ink: #1c0512;
+      --accent-2: #22e4ff;
+      --gold: #ffd23f;
+      --danger: #ff5a5f;
+      --add: #39ff88;
+      --flash: #22e4ff;
+      --flag: #ffd23f;
+      --syn-comment: var(--muted);
+      --syn-string: #ffb86b;
+      --syn-keyword: #c77dff;
+      --syn-number: #ff8fd8;
+      --syn-func: #8ab4ff;
+      --shadow: 0 14px 34px rgba(255, 62, 165, .16);
+    }
+
+    * { box-sizing: border-box; }
+    html { min-width: 320px; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      font-size: 14px;
+    }
+    button, input, textarea, select { font: inherit; }
+    button { cursor: pointer; }
+    button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible, .folder-diff-row:focus-visible { outline: 1px solid var(--accent); outline-offset: 1px; }
+    * { scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+    *::-webkit-scrollbar { width: 4px; height: 4px; }
+    *::-webkit-scrollbar-track { background: transparent; }
+    *::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
+    *::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+    .app { width: min(1600px, 100%); margin: 0 auto; padding: 26px clamp(16px, 3vw, 46px) 32px; }
+    .topbar { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin-bottom: 22px; flex-wrap: wrap; }
+    .brand { display: flex; align-items: baseline; gap: 12px; min-width: 0; }
+    h1 { margin: 0; font-size: clamp(25px, 4vw, 38px); letter-spacing: -.11em; line-height: 1; }
+    h1::after { content: "_"; color: var(--accent); animation: blink 1.15s steps(1) infinite; }
+    .tagline { color: var(--muted); font-size: 11px; letter-spacing: .04em; white-space: nowrap; }
+    @keyframes blink { 50% { opacity: 0; } }
+    .toolbar { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+    .saved-bar { display: flex; gap: 7px; align-items: center; overflow-x: auto; margin: -6px 0 20px; padding: 5px 0 9px; border-bottom: 1px solid var(--border); }
+    .saved-tab {
+      flex: 0 0 auto; display: flex; align-items: center; gap: 2px; border: 1px solid var(--border); border-radius: 5px;
+      color: var(--muted); font-size: 12px; transition: background .15s, border-color .15s, color .15s;
+    }
+    .saved-tab.active { border-color: var(--accent); color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+    .saved-tab.pinned { border-color: color-mix(in srgb, var(--accent) 55%, var(--border)); }
+    .saved-pin { appearance: none; border: 0; background: transparent; color: inherit; padding: 6px 0 6px 9px; opacity: .55; font-size: 12px; }
+    .saved-tab.pinned .saved-pin { opacity: 1; color: var(--accent); }
+    .saved-pin:hover { opacity: 1; }
+    .saved-name { padding: 6px 4px; cursor: pointer; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .saved-name-input {
+      appearance: none; border: 1px solid var(--accent); border-radius: 3px; background: var(--surface); color: var(--text);
+      padding: 4px 5px; margin: 2px 0; width: 140px; font-size: 12px;
+    }
+    .saved-dirty { color: var(--danger); font-size: 8px; padding-right: 1px; user-select: none; vertical-align: 2px; }
+    .saved-rename { appearance: none; border: 0; background: transparent; color: inherit; padding: 6px 4px; opacity: .45; font-size: 11px; line-height: 1; }
+    .saved-rename:hover { opacity: 1; color: var(--accent); }
+    .saved-dup { appearance: none; border: 0; background: transparent; color: inherit; padding: 6px 4px; opacity: .45; font-size: 12px; line-height: 1; }
+    .saved-dup:hover { opacity: 1; color: var(--accent); }
+    .saved-remove { appearance: none; border: 0; background: transparent; color: inherit; padding: 6px 9px 6px 4px; opacity: .5; font-size: 13px; line-height: 1; }
+    .saved-remove:hover { opacity: 1; color: var(--danger); }
+    .saved-add { flex: 0 0 auto; padding: 6px 9px; color: var(--muted); border-radius: 5px; }
+    .button, .icon-button {
+      appearance: none; border: 1px solid var(--border); color: var(--text); background: transparent;
+      border-radius: 5px; padding: 8px 11px; line-height: 1; transition: background .15s, border-color .15s, color .15s, transform .15s;
+    }
+    .button:hover, .icon-button:hover { border-color: var(--accent); color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+    .button:active, .icon-button:active { transform: translateY(1px); }
+    .button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+    .button.primary:hover { filter: brightness(1.06); color: var(--accent-ink); }
+    .button.danger { color: var(--danger); }
+    .button.danger:hover { border-color: var(--danger); background: color-mix(in srgb, var(--danger) 9%, transparent); }
+    .button:disabled { opacity: .45; cursor: default; pointer-events: none; }
+
+    .font-size-control { display: flex; border: 1px solid var(--border); border-radius: 5px; overflow: hidden; }
+    .font-size-control .icon-button { border: 0; border-radius: 0; padding: 8px 12px; font-size: 12px; font-weight: 700; }
+    .font-size-control .icon-button + .icon-button { border-left: 1px solid var(--border); }
+    .font-size-control .icon-button:disabled { opacity: .35; cursor: default; pointer-events: none; }
+
+    .options-row { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; margin-bottom: 16px; }
+    .options-row[hidden] { display: none; }
+    .option-group { display: flex; align-items: center; gap: 6px; }
+    .option-label { color: var(--muted); font-size: 11px; letter-spacing: .03em; text-transform: uppercase; }
+    .toggle-chip { border: 1px solid var(--border); border-radius: 99px; padding: 5px 11px; font-size: 11px; color: var(--muted); background: transparent; }
+    .toggle-chip.active { border-color: var(--accent); color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
+    .lang-select { border: 1px solid var(--border); border-radius: 99px; padding: 5px 9px; font-size: 11px; color: var(--muted); background: var(--surface-raised); cursor: pointer; }
+    .lang-select:hover { border-color: var(--accent); color: var(--accent); }
+    .view-toggle { display: flex; border: 1px solid var(--border); border-radius: 5px; overflow: hidden; }
+    .view-toggle button { border: 0; border-radius: 0; padding: 6px 11px; font-size: 11px; }
+    .view-toggle button.active { background: var(--accent); color: var(--accent-ink); }
+    .view-toggle button + button { border-left: 1px solid var(--border); }
+    .ignore-pattern-box {
+      display: flex; flex-wrap: wrap; align-items: center; gap: 4px;
+      border: 1px solid var(--border); border-radius: 14px; background: transparent;
+      padding: 3px 4px; min-width: 210px; max-width: 480px; transition: border-color .15s;
+    }
+    .ignore-pattern-box:focus-within { border-color: var(--accent); }
+    .ignore-pattern-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+    .ignore-pattern-chip {
+      display: inline-flex; align-items: center; gap: 2px;
+      background: color-mix(in srgb, var(--accent) 12%, transparent);
+      border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border));
+      color: var(--accent); border-radius: 99px; padding: 3px 4px 3px 10px; font-size: 10.5px; max-width: 190px;
+    }
+    .ignore-pattern-chip code {
+      font-family: inherit; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 145px;
+    }
+    .ignore-pattern-chip-remove {
+      appearance: none; border: 0; background: transparent; color: inherit; opacity: .65; cursor: pointer;
+      font-size: 13px; line-height: 1; padding: 3px 6px; border-radius: 50%;
+    }
+    .ignore-pattern-chip-remove:hover { opacity: 1; color: var(--danger); background: color-mix(in srgb, var(--danger) 15%, transparent); }
+    .ignore-pattern-input {
+      appearance: none; border: 0; background: transparent; color: var(--text);
+      padding: 5px 6px; font-size: 11px; flex: 1 1 100px; min-width: 100px;
+    }
+    .ignore-pattern-input.invalid { color: var(--danger); }
+    .ignore-pattern-input::placeholder { color: var(--muted); }
+    .ignore-pattern-count { font-size: 11px; color: var(--muted); white-space: nowrap; }
+    .ignore-pattern-count.active { color: var(--accent); }
+
+    .preview-panels { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 18px; }
+    .preview-panels[hidden] { display: none; }
+    .preview-pane { border: 1px solid var(--border); border-radius: 7px; overflow: hidden; background: var(--surface-raised); min-width: 0; }
+    .preview-pane-title {
+      display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 10px;
+      font-size: 12px; font-weight: 700; border-bottom: 1px solid var(--border); background: var(--surface);
+    }
+    .preview-type-badge {
+      font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--muted);
+      border: 1px solid var(--border); border-radius: 99px; padding: 2px 8px;
+    }
+    .preview-body { height: 380px; min-height: 150px; overflow: auto; resize: vertical; }
+    .preview-frame { width: 100%; height: 100%; border: 0; display: block; background: #fff; }
+    .preview-markdown { padding: 14px 16px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif; font-size: 13.5px; line-height: 1.6; color: var(--text); }
+    .preview-markdown h1, .preview-markdown h2, .preview-markdown h3, .preview-markdown h4, .preview-markdown h5, .preview-markdown h6 { margin: .6em 0 .3em; line-height: 1.25; }
+    .preview-markdown h1 { font-size: 1.6em; } .preview-markdown h2 { font-size: 1.35em; } .preview-markdown h3 { font-size: 1.15em; }
+    .preview-markdown p { margin: .5em 0; }
+    .preview-markdown code { background: color-mix(in srgb, var(--border) 45%, transparent); padding: 1px 5px; border-radius: 3px; font-size: .92em; font-family: ui-monospace, Consolas, monospace; }
+    .preview-markdown pre { background: color-mix(in srgb, var(--border) 28%, transparent); padding: 10px 12px; border-radius: 5px; overflow: auto; }
+    .preview-markdown pre code { background: none; padding: 0; }
+    .preview-markdown blockquote { margin: .5em 0; padding-left: 12px; border-left: 3px solid var(--border); color: var(--muted); }
+    .preview-markdown ul, .preview-markdown ol { margin: .4em 0; padding-left: 1.4em; }
+    .preview-markdown a { color: var(--accent); }
+    .preview-markdown img { max-width: 100%; }
+    .preview-markdown hr { border: 0; border-top: 1px solid var(--border); margin: 1em 0; }
+    .preview-plain { margin: 0; padding: 14px 16px; white-space: pre-wrap; word-break: break-word; font-size: var(--code-font-size); color: var(--text); }
+    .preview-empty { padding: 30px 16px; text-align: center; color: var(--muted); font-size: 12px; }
+    @media (max-width: 800px) { .preview-panels { grid-template-columns: 1fr; } }
+
+    .diff-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 14px; }
+    .diff-inputs[hidden] { display: none; }
+    .pane { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+    .pane-title {
+      border: 1px solid var(--border); border-radius: 4px; background: var(--surface-raised); color: var(--text);
+      padding: 7px 9px; font-size: 12px; font-weight: 700;
+    }
+    .pane textarea {
+      width: 100%; box-sizing: border-box; min-height: 460px; padding: 10px 11px; border: 1px solid var(--border); border-radius: 4px;
+      background: var(--surface-raised); color: var(--text); font-size: var(--code-font-size); line-height: 1.55; resize: vertical;
+      white-space: pre; overflow: auto; tab-size: 2;
+    }
+    /* .textarea-wrap being a plain (non-flex) block broke the textarea's
+       width -- previously it filled the pane only because it was a
+       DIRECT flex child (flex's default align-items:stretch); once it's
+       nested one level deeper for the stats badge, it needs an explicit
+       width instead of relying on that stretch. */
+    .textarea-wrap { position: relative; }
+    /* Bottom-left, not bottom-right, so it never sits under the textarea's
+       own native resize grip. */
+    .pane-stats {
+      position: absolute; bottom: 7px; left: 8px; font-size: 10.5px; color: var(--muted);
+      background: color-mix(in srgb, var(--surface-raised) 80%, transparent); padding: 1px 7px; border-radius: 99px;
+      pointer-events: none; user-select: none;
+    }
+    /* The per-pane search below keeps focus in its own input so Enter can
+       be pressed repeatedly without bouncing focus into the textarea --
+       but browsers only paint a vivid selection color on a FOCUSED field;
+       an unfocused one gets a muted "inactive" gray that's barely visible
+       against this dark theme. Force a real highlight color regardless of
+       focus state (::selection applies to both). */
+    .pane textarea::selection { background: var(--flash); color: var(--accent-ink); }
+
+    .diff-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 18px; }
+    .diff-stats { margin-left: auto; color: var(--muted); font-size: 11px; }
+    .diff-stats .added { color: var(--add); font-weight: 700; }
+    .diff-stats .removed { color: var(--danger); font-weight: 700; }
+
+    .diff-output {
+      border: 1px solid var(--border); border-radius: 7px; background: color-mix(in srgb, var(--surface) 88%, var(--bg));
+      max-height: 62vh; overflow-x: hidden; overflow-y: auto;
+    }
+    .diff-empty { padding: 44px 20px; text-align: center; color: var(--muted); font-size: 12px; }
+
+    .diff-row { display: flex; }
+    .diff-half { flex: 0 0 50%; width: 50%; display: flex; align-items: flex-start; min-width: 0; }
+    .diff-half + .diff-half { border-left: 1px solid var(--border); }
+    .diff-lineno {
+      flex: 0 0 42px; text-align: right; padding: 2px 8px; color: var(--muted); opacity: .55; font-size: calc(var(--code-font-size) - 1.5px);
+      user-select: none; align-self: stretch; line-height: 1.6;
+    }
+    .diff-line { flex: 1; min-width: 0; padding: 2px 10px; white-space: pre-wrap; word-break: break-word; font-size: var(--code-font-size); line-height: 1.6; }
+    .diff-half.del { background: color-mix(in srgb, var(--danger) 12%, transparent); }
+    .diff-half.add { background: color-mix(in srgb, var(--danger) 0%, var(--add) 12%); }
+    .diff-half.empty { background: repeating-linear-gradient(135deg, transparent, transparent 7px, color-mix(in srgb, var(--border) 55%, transparent) 7px, color-mix(in srgb, var(--border) 55%, transparent) 8px); }
+    /* A line matching the ignore pattern: muted/italic instead of the
+       usual del/add color, applied in place WITHOUT changing the diff's
+       row structure, pairing, or line numbering. */
+    .diff-ignored-text { opacity: .6; font-style: italic; }
+    .diff-word-add { background: color-mix(in srgb, var(--add) 40%, transparent); border-radius: 2px; }
+    .diff-word-del { background: color-mix(in srgb, var(--danger) 40%, transparent); border-radius: 2px; text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--danger) 70%, transparent); text-decoration-thickness: 1.5px; }
+
+    /* Syntax token colors (optional, via the Syntax dropdown) -- grouped
+       into a handful of buckets rather than one rule per Prism token
+       type, since at diff-line font sizes finer distinctions than
+       comment/string/keyword/number/name are hard to tell apart anyway.
+       These sit *underneath* .diff-word-add/.diff-word-del -- a token
+       inside a changed span still gets both, .tok-* for color and the
+       del/ins wrapper for the change background/strikethrough. */
+    .tok-comment, .tok-prolog, .tok-doctype, .tok-cdata { color: var(--syn-comment); font-style: italic; }
+    .tok-string, .tok-char, .tok-attr-value, .tok-regex, .tok-url { color: var(--syn-string); }
+    .tok-keyword, .tok-atrule, .tok-important { color: var(--syn-keyword); }
+    .tok-number, .tok-boolean, .tok-constant, .tok-symbol { color: var(--syn-number); }
+    .tok-function, .tok-class-name, .tok-tag, .tok-attr-name, .tok-selector, .tok-property, .tok-namespace { color: var(--syn-func); }
+
+    /* Per-hunk "copy this block to the other side" arrows, centered on
+       the vertical midpoint of the whole hunk (which can span several
+       .diff-row lines), sitting right on the column seam like Meld/
+       Beyond Compare's copy-left/copy-right controls. */
+    .diff-group { position: relative; }
+    .diff-group-actions {
+      position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      display: flex; gap: 4px; z-index: 5; opacity: .85; transition: opacity .15s ease, transform .15s ease;
+    }
+    .diff-group:hover .diff-group-actions, .diff-group:focus-within .diff-group-actions { opacity: 1; transform: translate(-50%, -50%) scale(1.12); }
+    .diff-copy-btn {
+      width: 24px; height: 24px; padding: 0; border-radius: 50%; border: 1.5px solid var(--accent);
+      background: var(--surface-raised); color: var(--accent); font-size: 13px; font-weight: 700; line-height: 1;
+      display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 1px 4px rgba(0,0,0,.25);
+    }
+    .diff-copy-btn:hover, .diff-copy-btn:focus-visible { color: var(--accent-ink); background: var(--accent); }
+
+    .diff-unified .diff-row { }
+    .diff-unified .diff-marker { flex: 0 0 20px; text-align: center; color: var(--muted); opacity: .7; padding: 2px 0; user-select: none; line-height: 1.6; }
+    .diff-unified .diff-row.del { background: color-mix(in srgb, var(--danger) 12%, transparent); }
+    .diff-unified .diff-row.add { background: color-mix(in srgb, var(--add) 12%, transparent); }
+    .diff-unified .diff-row.del .diff-marker { color: var(--danger); }
+    .diff-unified .diff-row.add .diff-marker { color: var(--add); }
+    .diff-unified .diff-lineno { flex: 0 0 52px; }
+
+    .diff-fold {
+      padding: 10px 14px; text-align: center; color: var(--muted); font-size: 14px; cursor: pointer;
+      background: color-mix(in srgb, var(--border) 30%, transparent); user-select: none;
+    }
+    .diff-fold:hover { color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+    .diff-row[data-hunk] { scroll-margin-top: 12px; }
+    .diff-row.hunk-flash .diff-half, .diff-row.hunk-flash.del, .diff-row.hunk-flash.add {
+      outline: 2px solid var(--flash); outline-offset: -2px;
+      box-shadow: inset 0 0 0 999px color-mix(in srgb, var(--flash) 22%, transparent);
+    }
+    /* Click a changed row's gutter (line number / +-marker) to flag it
+       for later, independent of the flash highlight -- persists until
+       the next re-render (view toggle, whitespace toggle, or recompare),
+       same as the fold state and ]/[ position already do. */
+    .diff-row[data-hunk] .diff-lineno, .diff-row[data-hunk] .diff-marker { cursor: pointer; }
+    .diff-row[data-hunk] .diff-lineno:hover, .diff-row[data-hunk] .diff-marker:hover { color: var(--flag); opacity: 1; }
+    .diff-row.hunk-bookmarked { box-shadow: inset 3px 0 0 0 var(--flag); }
+    .diff-row.hunk-bookmarked .diff-lineno, .diff-row.hunk-bookmarked .diff-marker { color: var(--flag); opacity: 1; }
+
+    .diff-panel { margin-bottom: 18px; }
+    .diff-panel:last-child { margin-bottom: 0; }
+    .diff-panel-title { font-size: 12px; font-weight: 700; margin-bottom: 6px; color: var(--muted); }
+    .diff-panel .diff-output { max-height: 40vh; }
+
+    /* ── 3-way merge panel ────────────────────────────────────────── */
+    .merge-panel[hidden] { display: none; }
+    .merge-panel { display: block; margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--border); }
+    .merge-panel-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 10px; flex-wrap: wrap; }
+    .merge-panel-title { font-size: 15px; margin: 0; }
+    .merge-summary { font-size: 12px; color: var(--muted); }
+    .merge-summary .mc-pending { color: var(--danger); font-weight: 600; }
+    .merge-summary .mc-done { color: var(--add); font-weight: 600; }
+    .merge-blocks { border: 1px solid var(--border); border-radius: 7px; overflow: hidden; margin-bottom: 14px; font-size: 12.5px; }
+    .merge-block { padding: 8px 12px; border-bottom: 1px solid var(--border); }
+    .merge-block:last-child { border-bottom: 0; }
+    .merge-block-context { color: var(--muted); background: var(--surface); }
+    .merge-block-auto { background: color-mix(in srgb, var(--flash) 7%, transparent); }
+    .merge-block-conflict { background: color-mix(in srgb, var(--danger) 6%, transparent); }
+    .merge-block-label { font-size: 10.5px; text-transform: uppercase; letter-spacing: .03em; color: var(--muted); margin-bottom: 6px; }
+    .merge-line { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space: pre-wrap; word-break: break-word; line-height: 1.55; }
+    .merge-line-removed { color: var(--danger); text-decoration: line-through; opacity: .75; }
+    .merge-line-added { color: var(--add); }
+    .merge-conflict-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 8px; }
+    .merge-conflict-side { border: 1px solid var(--border); border-radius: 5px; padding: 6px 8px; background: var(--surface); min-width: 0; }
+    .merge-conflict-side.chosen { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--surface)); }
+    .merge-conflict-side h4 { margin: 0 0 4px; font-size: 10.5px; text-transform: uppercase; letter-spacing: .03em; color: var(--muted); font-weight: 600; }
+    .merge-conflict-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+    .merge-output-section { display: flex; flex-direction: column; gap: 8px; }
+    .merge-output-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+    .merge-output-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .merge-output-textarea {
+      width: 100%; box-sizing: border-box; min-height: 200px; resize: vertical; border: 1px solid var(--border); border-radius: 7px;
+      background: var(--surface-raised); color: var(--text); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: var(--code-font-size); line-height: 1.55; padding: 10px 12px;
+    }
+
+    .lineending-banner {
+      display: flex; align-items: center; gap: 10px; padding: 9px 13px; margin-bottom: 14px; border-radius: 5px;
+      border: 1px solid color-mix(in srgb, var(--danger) 45%, var(--border)); background: color-mix(in srgb, var(--danger) 10%, transparent);
+      color: var(--text); font-size: 12px;
+    }
+    /* Author display:flex above beats the UA stylesheet's [hidden] {
+       display:none} regardless of specificity (same cascade-origin rule
+       that bit the 3-way Base pane earlier) -- without this, a "hidden"
+       banner still renders as an empty bordered box. */
+    .lineending-banner[hidden] { display: none; }
+    .lineending-banner button { margin-left: auto; }
+
+    /* The title input and the search input are capped to the SAME
+       max-width (sized to whichever row's trailing controls are wider --
+       the search row's count+prev+next cluster) so the two entry boxes
+       are the same length. Paste and the search's prev/next buttons keep
+       their own natural size and stay pinned to the right edge via
+       margin-left:auto, soaking up whatever width the (now-shorter)
+       input isn't using. */
+    .pane-head { display: flex; gap: 6px; align-items: center; }
+    .pane-head .pane-title { flex: 1 1 auto; min-width: 0; max-width: calc(100% - 76px); }
+    .pane-paste { flex: 0 0 auto; margin-left: auto; padding: 7px 9px; font-size: 11px; color: var(--muted); }
+    .pane.drag-over textarea { border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 25%, transparent); }
+
+    .pane-search { display: flex; align-items: center; gap: 6px; }
+    .pane-search-input {
+      flex: 1 1 auto; min-width: 0; max-width: calc(100% - 76px); appearance: none; border: 1px solid var(--border);
+      border-radius: 4px; background: var(--surface-raised); color: var(--text); padding: 6px 8px; font-size: 11.5px;
+    }
+    .pane-search-input::placeholder { color: var(--muted); }
+    .pane-search-input.no-match { border-color: var(--danger); }
+    .pane-search-controls { flex: 0 0 auto; margin-left: auto; display: flex; align-items: center; gap: 2px; }
+    .pane-search-count { min-width: 26px; text-align: center; font-size: 10.5px; color: var(--muted); }
+    .pane-search-nav {
+      appearance: none; border: 1px solid var(--border); border-radius: 4px; background: var(--surface);
+      color: var(--muted); width: 20px; height: 20px; padding: 0; font-size: 9px; line-height: 1;
+    }
+    .pane-search-nav:hover { color: var(--accent); border-color: var(--accent); }
+
+    .diff-empty { color: var(--muted); font-size: 12px; text-align: center; margin: 25px 8px; }
+    .footer { margin-top: 18px; color: var(--muted); font-size: 11px; display: flex; justify-content: space-between; gap: 14px; flex-wrap: wrap; border-top: 1px solid var(--border); padding-top: 15px; }
+    .footer strong { color: var(--text); font-weight: 700; }
+    .shortcut { border: 1px solid var(--border); border-radius: 3px; padding: 1px 4px; color: var(--text); }
+
+    dialog { color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 0; width: min(540px, calc(100vw - 32px)); max-height: min(82vh, 680px); box-shadow: var(--shadow); }
+    dialog::backdrop { background: rgba(0,0,0,.55); backdrop-filter: blur(2px); }
+    .modal-form { padding: 22px; max-height: min(82vh, 680px); overflow-y: auto; box-sizing: border-box; }
+    .modal-heading { margin: 0 0 20px; font-size: 19px; letter-spacing: -.05em; }
+    .modal-actions { margin-top: 22px; display: flex; align-items: center; gap: 9px; }
+    .modal-actions .spacer { flex: 1; }
+    .about-copy { color: var(--muted); line-height: 1.6; margin: 0 0 18px; }
+    .about-copy strong { color: var(--text); }
+    .about-feature-heading { margin: 0 0 6px; font-size: 11px; letter-spacing: .03em; text-transform: uppercase; color: var(--accent); }
+    .about-feature-list { margin: 0 0 16px; padding-left: 18px; color: var(--muted); font-size: 12.5px; line-height: 1.7; }
+    .about-feature-list li strong { color: var(--text); }
+    .about-shortcuts { width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 20px; }
+    .about-shortcuts td { padding: 6px 0; border-bottom: 1px solid var(--border); }
+    .about-shortcuts td:last-child { color: var(--muted); text-align: right; }
+
+    .toast { position: fixed; left: 50%; bottom: 22px; transform: translate(-50%, 16px); background: var(--text); color: var(--bg); padding: 9px 13px; border-radius: 4px; font-size: 12px; box-shadow: var(--shadow); opacity: 0; pointer-events: none; transition: opacity .18s, transform .18s; z-index: 20; }
+    .toast.visible { opacity: 1; transform: translate(-50%, 0); }
+    .save-indicator { display: inline-block; color: var(--muted); font-size: 14px; line-height: 1; margin-left: -5px; vertical-align: -1px; }
+    .save-indicator.pulse { color: var(--accent); animation: save-pulse .6s ease-out; }
+    @keyframes save-pulse { 0% { transform: scale(.75); opacity: .3; } 45% { transform: scale(1.35); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
+
+    /* ── Mode toggle (Text Compare / Folder Compare) ────────────────── */
+    .mode-toggle { display: flex; width: fit-content; border: 1px solid var(--border); border-radius: 5px; overflow: hidden; margin-bottom: 14px; }
+    .mode-toggle button { border: 0; border-radius: 0; padding: 8px 16px; font-size: 12px; color: var(--muted); background: transparent; }
+    .mode-toggle button + button { border-left: 1px solid var(--border); }
+    .mode-toggle button.active { background: var(--accent); color: var(--accent-ink); }
+
+    /* ── Folder compare ───────────────────────────────────────────── */
+    .folder-mode-panel[hidden] { display: none; }
+    .folder-mode-panel { display: block; }
+    .folder-mode-note { margin: 0 0 12px; font-size: 12px; color: var(--muted); }
+    .folder-pick-row { display: flex; align-items: stretch; gap: 14px; margin-bottom: 14px; }
+    .folder-pick-card {
+      flex: 1; min-width: 0; border: 1px solid var(--border); border-radius: 8px; padding: 14px;
+      display: flex; flex-direction: column; gap: 8px; background: var(--surface-raised);
+    }
+    .folder-pick-label { font-size: 11px; letter-spacing: .03em; text-transform: uppercase; color: var(--muted); }
+    .folder-pick-info { font-size: 12px; color: var(--muted); word-break: break-word; }
+    .folder-pick-info.picked { color: var(--text); }
+    .folder-pick-swap { display: flex; align-items: center; }
+    .folder-diff-actions { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; flex-wrap: wrap; }
+    .folder-diff-summary { font-size: 12px; color: var(--muted); }
+    .folder-diff-summary strong { font-weight: 600; }
+    .folder-diff-summary .fd-added { color: var(--add); }
+    .folder-diff-summary .fd-removed { color: var(--danger); }
+    .folder-diff-summary .fd-modified { color: var(--flash); }
+    .folder-search-input {
+      appearance: none; border: 1px solid var(--border); border-radius: 99px; background: transparent; color: var(--text);
+      padding: 5px 11px; font-size: 11px; width: 220px;
+    }
+    .folder-search-input::placeholder { color: var(--muted); }
+    .folder-diff-list { border: 1px solid var(--border); border-radius: 7px; overflow: hidden; }
+    .folder-diff-row {
+      display: flex; align-items: center; gap: 10px; padding: 7px 12px; border-bottom: 1px solid var(--border);
+      cursor: pointer; font-size: 12.5px;
+    }
+    .folder-diff-row:last-child { border-bottom: 0; }
+    .folder-diff-row:hover { background: color-mix(in srgb, var(--accent) 6%, transparent); }
+    .folder-diff-row-status {
+      flex: 0 0 auto; width: 15px; text-align: center; font-weight: 700; border-radius: 3px; font-size: 11px;
+      padding: 1px 0;
+    }
+    .folder-diff-row[data-status="added"] .folder-diff-row-status { color: var(--add); }
+    .folder-diff-row[data-status="removed"] .folder-diff-row-status { color: var(--danger); }
+    .folder-diff-row[data-status="modified"] .folder-diff-row-status { color: var(--flash); }
+    .folder-diff-row[data-status="unchanged"] .folder-diff-row-status { color: var(--muted); opacity: .5; }
+    .folder-diff-row[data-status="added"] { background: color-mix(in srgb, var(--add) 6%, transparent); }
+    .folder-diff-row[data-status="removed"] { background: color-mix(in srgb, var(--danger) 6%, transparent); }
+    .folder-diff-row-path { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .folder-diff-row-meta { flex: 0 0 auto; font-size: 10.5px; color: var(--muted); }
+    .folder-diff-row-caret { flex: 0 0 auto; font-size: 10px; color: var(--muted); transition: transform .15s; }
+    .folder-diff-row.expanded .folder-diff-row-caret { transform: rotate(90deg); }
+    .folder-diff-row-detail { border-bottom: 1px solid var(--border); background: var(--surface); }
+    .folder-diff-row-detail:last-child { border-bottom: 0; }
+    .folder-diff-row-detail .diff-output { border: 0; border-radius: 0; max-height: 420px; }
+    .folder-diff-row-detail-empty { padding: 14px; font-size: 12px; color: var(--muted); }
+    .folder-image-diff { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1px; background: var(--border); }
+    .folder-image-diff-cell { background: var(--surface); padding: 10px; display: flex; flex-direction: column; gap: 6px; align-items: center; min-width: 0; }
+    .folder-image-diff-cell h4 { margin: 0; font-size: 10.5px; text-transform: uppercase; letter-spacing: .03em; color: var(--muted); font-weight: 600; }
+    .folder-image-diff-cell canvas, .folder-image-diff-cell img { max-width: 100%; max-height: 320px; background: repeating-conic-gradient(#8883 0% 25%, transparent 0% 50%) 50% / 16px 16px; border-radius: 4px; }
+    .folder-diff-progress { padding: 14px; font-size: 12px; color: var(--muted); }
+
+    /* --- Vegas extras: glow and motion that only make sense on the neon theme --- */
+    [data-theme="vegas"] body { background: radial-gradient(120% 70% at 50% -10%, rgba(255, 62, 165, .16), transparent 60%), radial-gradient(90% 60% at 100% 110%, rgba(34, 228, 255, .1), transparent 60%), var(--bg); background-attachment: fixed; }
+    [data-theme="vegas"] h1 { color: #fff; text-shadow: 0 0 2px #fff, 0 0 10px var(--accent), 0 0 24px var(--accent), 0 0 48px color-mix(in srgb, var(--accent) 60%, transparent); animation: neon-flicker 7s infinite; }
+    [data-theme="vegas"] h1::after { color: var(--accent-2); text-shadow: 0 0 10px var(--accent-2); }
+    [data-theme="vegas"] .tagline { color: var(--gold); }
+    @keyframes neon-flicker { 0%, 91%, 93%, 96%, 100% { opacity: 1; } 92%, 95% { opacity: .55; } }
+    /* Marquee bulbs chase along under the saved-comparison tabs, like a casino sign, in their own
+       strip of bottom padding so they never run into a tab's glow. */
+    [data-theme="vegas"] .saved-bar { padding-bottom: 22px; border-bottom-color: transparent; background: radial-gradient(circle, var(--gold) 0 1.6px, transparent 2.4px) 0 calc(100% - 6px) / 16px 6px repeat-x; animation: marquee 1.6s steps(4) infinite; }
+    @keyframes marquee { from { background-position: 0 calc(100% - 6px); } to { background-position: 16px calc(100% - 6px); } }
+    [data-theme="vegas"] .saved-tab.active { box-shadow: 0 0 7px color-mix(in srgb, var(--accent) 50%, transparent); }
+    [data-theme="vegas"] .button:hover, [data-theme="vegas"] .button.primary, [data-theme="vegas"] .mode-toggle button.active, [data-theme="vegas"] .view-toggle button.active { box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 50%, transparent); }
+    [data-theme="vegas"] .toggle-chip.active { color: var(--accent-2); border-color: var(--accent-2); background: color-mix(in srgb, var(--accent-2) 12%, transparent); box-shadow: 0 0 8px color-mix(in srgb, var(--accent-2) 45%, transparent); }
+    [data-theme="vegas"] .diff-output, [data-theme="vegas"] .folder-diff-list, [data-theme="vegas"] .merge-blocks { border-color: color-mix(in srgb, var(--accent) 38%, var(--border)); box-shadow: 0 0 22px color-mix(in srgb, var(--accent) 10%, transparent); }
+    [data-theme="vegas"] .pane textarea:focus { border-color: var(--accent-2); box-shadow: 0 0 12px color-mix(in srgb, var(--accent-2) 35%, transparent); }
+    [data-theme="vegas"] .diff-stats .added, [data-theme="vegas"] .diff-stats .removed { text-shadow: 0 0 6px currentColor; }
+    [data-theme="vegas"] .about-feature-heading { color: var(--accent-2); text-shadow: 0 0 8px color-mix(in srgb, var(--accent-2) 70%, transparent); }
+    [data-theme="vegas"] .save-indicator.pulse { text-shadow: 0 0 10px var(--accent); }
+    @media (prefers-reduced-motion: reduce) {
+      [data-theme="vegas"] h1, [data-theme="vegas"] .saved-bar { animation: none; }
+    }
+
+    @media (max-width: 800px) {
+      .diff-inputs { grid-template-columns: 1fr; }
+      .diff-row { flex-direction: column; }
+      .diff-half + .diff-half { border-left: 0; border-top: 1px solid var(--border); }
+      /* The copy-hunk arrows are centered on the seam between the two
+         side-by-side columns; once .diff-row stacks them vertically above,
+         that seam doesn't exist and the buttons would just float over
+         wrapped text instead. */
+      .diff-group-actions { display: none; }
+      .footer { display: block; line-height: 1.8; }
+      .folder-pick-row { flex-direction: column; }
+      .folder-image-diff { grid-template-columns: 1fr; }
+      .merge-conflict-columns { grid-template-columns: 1fr; }
+    }
+
+    /* Printing the live page (as opposed to the separate "HTML Report"
+       export) should show the diff, not the editing chrome -- and must
+       force light-safe variable values, since dark-theme --text is
+       near-white and would be invisible against a forced white page. */
+    @media print {
+      :root, :root:not([data-theme]), [data-theme="dark"], [data-theme="light"], [data-theme="vegas"] {
+        --bg: #ffffff; --surface: #ffffff; --surface-raised: #ffffff; --text: #111111; --muted: #555555;
+        --border: #cccccc; --accent: #1a7a44; --accent-ink: #ffffff; --danger: #b83b31; --flash: #1a56c4; --shadow: none;
+        --add: var(--accent); --flag: #b8860b; --syn-string: #0e7c86; --syn-keyword: #7139b0; --syn-number: #b3620c; --syn-func: #af3a7f;
+      }
+      [data-theme="vegas"] body { background: #ffffff; }
+      [data-theme="vegas"] .diff-output, [data-theme="vegas"] .diff-stats .added, [data-theme="vegas"] .diff-stats .removed { box-shadow: none; text-shadow: none; }
+      .topbar, .saved-bar, .options-row, .diff-inputs, .diff-actions, .lineending-banner, #json-fallback-banner, .preview-panels, .footer, .mode-toggle, .folder-mode-panel, .merge-panel, .diff-group-actions { display: none !important; }
+      .app { padding: 0; max-width: 100%; }
+      .diff-output, .diff-panel .diff-output { max-height: none !important; overflow: visible !important; border-color: #ccc; }
+      .diff-half.empty { background: repeating-linear-gradient(135deg, transparent, transparent 7px, #ddd 7px, #ddd 8px); }
+    }

@@ -1,0 +1,342 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <script>
+    // Apply a stored theme before first paint so a light/dark/vegas choice doesn't flash the
+    // system theme while app.js loads. No attribute means "system" (follow prefers-color-scheme).
+    (function () {
+      try {
+        var t = localStorage.getItem('delta_theme');
+        if (t === 'light' || t === 'dark' || t === 'vegas') document.documentElement.setAttribute('data-theme', t);
+      } catch (e) {}
+    })();
+  </script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark light">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='13' fill='%23101311'/%3E%3Crect x='3' y='3' width='58' height='58' rx='11' fill='none' stroke='%23364038' stroke-width='2'/%3E%3Cpath d='M32 13 L51 47 L13 47 Z' fill='none' stroke='%238cd3a0' stroke-width='6' stroke-linejoin='miter'/%3E%3C/svg%3E">
+  <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='13' fill='%23101311'/%3E%3Crect x='3' y='3' width='58' height='58' rx='11' fill='none' stroke='%23364038' stroke-width='2'/%3E%3Cpath d='M32 13 L51 47 L13 47 Z' fill='none' stroke='%238cd3a0' stroke-width='6' stroke-linejoin='miter'/%3E%3C/svg%3E">
+  <title>Delta v1.0 - Local Diff / Compare</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="app">
+    <header class="topbar">
+      <div class="brand"><h1>delta</h1><span class="tagline">v1.0 · local diff / compare · zero dependencies</span><span id="save-indicator" class="save-indicator" title="Saved locally" aria-label="Saved locally">●</span></div>
+      <nav class="toolbar" aria-label="Controls">
+        <div class="font-size-control" role="group" aria-label="Text size">
+          <button class="icon-button" id="font-size-down" type="button" title="Smaller text" aria-label="Decrease text size">A−</button>
+          <button class="icon-button" id="font-size-up" type="button" title="Larger text" aria-label="Increase text size">A+</button>
+        </div>
+        <button class="button" id="theme-toggle" type="button" aria-label="Switch color theme">Theme</button>
+        <button class="button" id="export-button" type="button">Export</button>
+        <button class="button" id="import-button" type="button">Import</button>
+        <input id="import-file" type="file" accept="application/json,.json" hidden>
+        <button class="button" id="about-button" type="button">About</button>
+      </nav>
+    </header>
+
+    <div class="mode-toggle" role="tablist" aria-label="Compare mode">
+      <button type="button" data-app-mode="text" class="active">Text Compare</button>
+      <button type="button" data-app-mode="folder">Folder Compare</button>
+    </div>
+
+    <div id="text-mode-panel">
+    <nav id="saved-bar" class="saved-bar" aria-label="Saved comparisons"></nav>
+
+    <div class="options-row">
+      <div class="option-group">
+        <span class="option-label">Compare</span>
+        <button class="toggle-chip" id="opt-ignore-case" type="button" data-opt="ignoreCase">Ignore case</button>
+        <button class="toggle-chip" id="opt-ignore-ws" type="button" data-opt="ignoreWhitespace">Ignore whitespace</button>
+        <button class="toggle-chip" id="opt-only-changes" type="button" data-opt="onlyChanges">Only changes</button>
+        <button class="toggle-chip" id="opt-json-mode" type="button" data-opt="jsonMode" title="Pretty-print both sides as JSON before comparing, when both parse as valid JSON">Pretty-print JSON</button>
+        <div class="ignore-pattern-box" id="ignore-pattern-box">
+          <div class="ignore-pattern-chips" id="ignore-pattern-chips"></div>
+          <input type="text" id="ignore-pattern" class="ignore-pattern-input" placeholder="Ignore lines matching (regex)... Enter to add" title="Add one or more regex patterns. Any line containing a match (on either side, from any pattern) is treated as unchanged, even if the rest of that line differs too -- the raw text is still shown, just never flagged as a difference. Press Enter to add a pattern; remove one with Backspace (when the field is empty) or its ×. Patterns are saved and restored automatically.">
+        </div>
+        <span class="ignore-pattern-count" id="ignore-pattern-count" aria-live="polite"></span>
+
+      </div>
+      <div class="option-group">
+        <span class="option-label">View</span>
+        <div class="view-toggle" role="tablist" aria-label="Diff view mode">
+          <button type="button" data-view="split" class="active">Split</button>
+          <button type="button" data-view="unified">Unified</button>
+        </div>
+        <button class="toggle-chip" id="opt-live" type="button" title="Automatically re-compare shortly after you stop typing, instead of requiring Compare/ctrl+enter">Live</button>
+        <button class="toggle-chip" id="opt-preview" type="button" title="Render Version A/B below as HTML or Markdown, when detected">Preview</button>
+        <button class="toggle-chip" id="opt-whitespace" type="button" title="Show every space (·) and tab (→) in the diff, not just whitespace-only changes">Whitespace</button>
+        <select class="lang-select" id="syntax-lang" title="Syntax highlight both sides as this language (heuristic tokenizer -- won't be perfect on every edge case)">
+          <option value="">No syntax highlighting</option>
+          <option value="javascript">JavaScript</option>
+          <option value="typescript">TypeScript</option>
+          <option value="python">Python</option>
+          <option value="json">JSON</option>
+          <option value="css">CSS</option>
+          <option value="markup">HTML / XML</option>
+          <option value="bash">Bash / Shell</option>
+          <option value="sql">SQL</option>
+          <option value="yaml">YAML</option>
+          <option value="go">Go</option>
+          <option value="rust">Rust</option>
+          <option value="java">Java</option>
+          <option value="csharp">C#</option>
+          <option value="c">C</option>
+          <option value="cpp">C++</option>
+          <option value="markdown">Markdown</option>
+        </select>
+      </div>
+      <div class="option-group">
+        <button class="toggle-chip" id="base-toggle" type="button" title="Compare A and B against a shared original">+ Base (3-way)</button>
+      </div>
+    </div>
+
+    <section class="diff-inputs" id="base-pane-row" hidden>
+      <div class="pane" style="grid-column: 1 / -1;" data-pane="base">
+        <div class="pane-head">
+          <input class="pane-title" id="label-base" maxlength="80" placeholder="Base / Original" value="Base">
+          <button class="button pane-paste" type="button" data-paste="text-base">Paste</button>
+        </div>
+        <div class="pane-search">
+          <input type="text" class="pane-search-input" data-search-input="text-base" placeholder="Find in Base...">
+          <div class="pane-search-controls">
+            <span class="pane-search-count" data-search-count="text-base"></span>
+            <button type="button" class="pane-search-nav" data-search-prev="text-base" title="Previous match (Shift+Enter)">▲</button>
+            <button type="button" class="pane-search-nav" data-search-next="text-base" title="Next match (Enter)">▼</button>
+          </div>
+        </div>
+        <div class="textarea-wrap">
+          <textarea id="text-base" placeholder="Paste the shared original text here (or drag a file onto this box). A and B will each be diffed against this." spellcheck="false"></textarea>
+          <span class="pane-stats" id="stats-text-base"></span>
+        </div>
+      </div>
+    </section>
+
+    <section class="diff-inputs">
+      <div class="pane" data-pane="a">
+        <div class="pane-head">
+          <input class="pane-title" id="label-a" maxlength="80" placeholder="Version A" value="Version A">
+          <button class="button pane-paste" type="button" data-paste="text-a">Paste</button>
+        </div>
+        <div class="pane-search">
+          <input type="text" class="pane-search-input" data-search-input="text-a" placeholder="Find in Version A...">
+          <div class="pane-search-controls">
+            <span class="pane-search-count" data-search-count="text-a"></span>
+            <button type="button" class="pane-search-nav" data-search-prev="text-a" title="Previous match (Shift+Enter)">▲</button>
+            <button type="button" class="pane-search-nav" data-search-next="text-a" title="Next match (Enter)">▼</button>
+          </div>
+        </div>
+        <div class="textarea-wrap">
+          <textarea id="text-a" placeholder="Paste the first text here, or drag a file onto this box..." spellcheck="false"></textarea>
+          <span class="pane-stats" id="stats-text-a"></span>
+        </div>
+      </div>
+      <div class="pane" data-pane="b">
+        <div class="pane-head">
+          <input class="pane-title" id="label-b" maxlength="80" placeholder="Version B" value="Version B">
+          <button class="button pane-paste" type="button" data-paste="text-b">Paste</button>
+        </div>
+        <div class="pane-search">
+          <input type="text" class="pane-search-input" data-search-input="text-b" placeholder="Find in Version B...">
+          <div class="pane-search-controls">
+            <span class="pane-search-count" data-search-count="text-b"></span>
+            <button type="button" class="pane-search-nav" data-search-prev="text-b" title="Previous match (Shift+Enter)">▲</button>
+            <button type="button" class="pane-search-nav" data-search-next="text-b" title="Next match (Enter)">▼</button>
+          </div>
+        </div>
+        <div class="textarea-wrap">
+          <textarea id="text-b" placeholder="Paste the second text here, or drag a file onto this box..." spellcheck="false"></textarea>
+          <span class="pane-stats" id="stats-text-b"></span>
+        </div>
+      </div>
+    </section>
+
+    <div class="diff-actions">
+      <button class="button primary" id="compare-button" type="button">Compare</button>
+      <button class="button" id="swap-button" type="button" title="Swap A and B">⇄ Swap</button>
+      <button class="button" id="save-button" type="button" title="Updates the currently loaded comparison, or creates one if none is loaded">Save</button>
+      <button class="button" id="copy-diff-button" type="button">Copy Diff</button>
+      <button class="button" id="download-diff-button" type="button" title="Download the unified diff as a .patch file">Download .patch</button>
+      <button class="button" id="html-report-button" type="button" title="Open a standalone, shareable HTML report of this diff in a new tab">HTML Report</button>
+      <button class="button" id="html-report-download-button" type="button" title="Download the standalone HTML report as a file">Download Report</button>
+      <button class="button" id="share-button" type="button">Share Link</button>
+      <button class="button" id="undo-button" type="button" title="Undo the last edit, paste, drag-drop, swap, clear, or load" disabled>Undo</button>
+      <button class="button" id="redo-button" type="button" title="Redo the last undone change" disabled>Redo</button>
+      <button class="button" id="clear-button" type="button">Clear</button>
+      <span class="diff-stats" id="diff-stats"></span>
+    </div>
+
+    <div id="lineending-banner" class="lineending-banner" hidden></div>
+    <div id="json-fallback-banner" class="lineending-banner" hidden></div>
+    <div id="large-input-banner" class="lineending-banner" hidden></div>
+
+    <div id="preview-panels" class="preview-panels" hidden>
+      <div class="preview-pane">
+        <div class="preview-pane-title"><span id="preview-title-a">Version A</span><span class="preview-type-badge" id="preview-badge-a"></span></div>
+        <div class="preview-body" id="preview-body-a"></div>
+      </div>
+      <div class="preview-pane">
+        <div class="preview-pane-title"><span id="preview-title-b">Version B</span><span class="preview-type-badge" id="preview-badge-b"></span></div>
+        <div class="preview-body" id="preview-body-b"></div>
+      </div>
+    </div>
+
+    <section id="diff-output" class="diff-output">
+      <div class="diff-empty">Paste two versions above and click Compare (or press <span class="shortcut">ctrl</span>+<span class="shortcut">enter</span>).</div>
+    </section>
+    <div id="diff-panels"></div>
+
+    <div id="merge-panel" class="merge-panel" hidden>
+      <div class="merge-panel-head">
+        <h2 class="merge-panel-title">3-Way Merge</h2>
+        <span class="merge-summary" id="merge-summary"></span>
+      </div>
+      <div class="merge-blocks" id="merge-blocks"></div>
+      <div class="merge-output-section">
+        <div class="merge-output-head">
+          <span class="option-label">Merged Result</span>
+          <div class="merge-output-actions">
+            <button class="button" type="button" id="merge-copy-button">Copy</button>
+            <button class="button" type="button" id="merge-download-button">Download .txt</button>
+            <button class="button" type="button" id="merge-to-a-button" title="Replace Version A with the merged result">→ Version A</button>
+            <button class="button" type="button" id="merge-to-b-button" title="Replace Version B with the merged result">→ Version B</button>
+          </div>
+        </div>
+        <textarea id="merge-output" class="merge-output-textarea" spellcheck="false" title="Unresolved conflicts show as <<<<<<< / ======= / >>>>>>> markers, same convention as git. Resolving a conflict above regenerates this box, overwriting any hand-edits made directly here -- resolve conflicts first, then fine-tune the text."></textarea>
+      </div>
+    </div>
+    </div>
+
+    <div id="folder-mode-panel" class="folder-mode-panel" hidden>
+      <p class="folder-mode-note">Runs entirely in your browser -- folders are read locally to compare them and are never uploaded or sent anywhere.</p>
+      <div class="folder-pick-row">
+        <div class="folder-pick-card" data-side="a">
+          <div class="folder-pick-label">Folder A</div>
+          <button class="button" type="button" id="folder-pick-a">Choose folder…</button>
+          <input type="file" id="folder-input-a" webkitdirectory multiple hidden>
+          <span class="folder-pick-info" id="folder-info-a">No folder selected</span>
+        </div>
+        <div class="folder-pick-swap">
+          <button class="icon-button" type="button" id="folder-swap-button" title="Swap Folder A and B">⇄</button>
+        </div>
+        <div class="folder-pick-card" data-side="b">
+          <div class="folder-pick-label">Folder B</div>
+          <button class="button" type="button" id="folder-pick-b">Choose folder…</button>
+          <input type="file" id="folder-input-b" webkitdirectory multiple hidden>
+          <span class="folder-pick-info" id="folder-info-b">No folder selected</span>
+        </div>
+      </div>
+
+      <div class="folder-diff-actions">
+        <button class="button primary" type="button" id="folder-compare-button" disabled>Compare Folders</button>
+        <span class="folder-diff-summary" id="folder-diff-summary"></span>
+      </div>
+
+      <div class="options-row" id="folder-filter-row" hidden>
+        <div class="option-group">
+          <span class="option-label">Show</span>
+          <button class="toggle-chip active" type="button" data-folder-filter="all">All</button>
+          <button class="toggle-chip" type="button" data-folder-filter="modified">Modified</button>
+          <button class="toggle-chip" type="button" data-folder-filter="added">Added</button>
+          <button class="toggle-chip" type="button" data-folder-filter="removed">Removed</button>
+          <button class="toggle-chip" type="button" data-folder-filter="unchanged">Unchanged</button>
+        </div>
+        <div class="option-group">
+          <input type="text" id="folder-search" class="folder-search-input" placeholder="Filter by path...">
+        </div>
+      </div>
+
+      <div class="folder-diff-list" id="folder-diff-list"></div>
+    </div>
+
+    <footer class="footer"><span><strong>delta</strong> · local-first diff &amp; compare, no accounts, nothing leaves the browser · <button class="button" id="about-button-2" type="button">About</button></span><span><kbd class="shortcut">ctrl</kbd>+<kbd class="shortcut">enter</kbd> compare · <kbd class="shortcut">ctrl</kbd>+<kbd class="shortcut">s</kbd> save · <kbd class="shortcut">ctrl</kbd>+<kbd class="shortcut">z</kbd> undo · <kbd class="shortcut">ctrl</kbd>+<kbd class="shortcut">shift</kbd>+<kbd class="shortcut">z</kbd> redo · <kbd class="shortcut">]</kbd>/<kbd class="shortcut">[</kbd> next/prev change · <kbd class="shortcut">alt</kbd>+<kbd class="shortcut">→</kbd>/<kbd class="shortcut">←</kbd> copy change</span></footer>
+  </main>
+
+  <dialog id="about-dialog" aria-labelledby="about-dialog-title">
+    <section class="modal-form">
+      <h2 class="modal-heading" id="about-dialog-title">delta v1.0_</h2>
+      <p class="about-copy"><strong>A local-first diff &amp; compare tool.</strong> Delta stores your saved comparisons in this browser's local storage. No account, network connection, or server is required. One optional feature (syntax highlighting) bundles a small third-party library, vendored locally rather than loaded from a CDN - everything else is still hand-written with zero dependencies.</p>
+
+      <h3 class="about-feature-heading">Text Compare</h3>
+      <ul class="about-feature-list">
+        <li>Line-level diff with word/character-level highlighting inside changed lines, in <strong>Split</strong> or <strong>Unified</strong> view</li>
+        <li><strong>Live mode</strong> (auto re-compare as you stop typing) and <strong>Preview mode</strong> (render Version A/B as HTML or Markdown)</li>
+        <li>Ignore case, ignore whitespace, only-show-changes, and pretty-print-JSON-before-comparing toggles</li>
+        <li><strong>Ignore lines matching (regex)</strong> - add multiple patterns as persisted, removable pills; a line matching any of them is shaded/italicized instead of flagged as changed, and it respects the Ignore Case toggle</li>
+        <li><strong>Base / 3-way</strong> mode - compare both A and B against a shared original at once, with a full <strong>3-way merge</strong>: changes made by only one side (or identically by both) auto-merge, genuine conflicts are flagged for you to resolve (take A, take B, or both, in either order), and the live merged result can be copied, downloaded, or sent back into Version A/B</li>
+        <li>Per-pane <strong>find/highlight</strong> in Version A, B, and Base, with next/previous jump</li>
+        <li>Font size control and a live line/character count per pane</li>
+        <li>Friendly banners for mismatched line endings, JSON parse fallback, and very large inputs</li>
+        <li>Persistent highlight with click-to-copy on <kbd class="shortcut">]</kbd>/<kbd class="shortcut">[</kbd> hunk navigation</li>
+        <li>In <strong>Split</strong> view, per-change <strong>copy-to-other-side arrows</strong> (or <kbd class="shortcut">alt</kbd>+<kbd class="shortcut">→</kbd>/<kbd class="shortcut">←</kbd> on a <kbd class="shortcut">]</kbd>/<kbd class="shortcut">[</kbd>-selected change) to move that block from Version A to B or back, with undo support - scrolls to and highlights the result so it's never a mystery where it landed</li>
+        <li><strong>Whitespace</strong> toggle - every space (·) and tab (→) made visible everywhere, not just inside a highlighted whitespace-only change</li>
+        <li><strong>Bookmark changes</strong> - click a changed row's line number/marker (or press <kbd class="shortcut">b</kbd> on a <kbd class="shortcut">]</kbd>/<kbd class="shortcut">[</kbd>-selected one) to flag it, then jump between flags with <kbd class="shortcut">{</kbd>/<kbd class="shortcut">}</kbd>, independent of sequential <kbd class="shortcut">]</kbd>/<kbd class="shortcut">[</kbd> navigation - resets on the next compare, same as fold state</li>
+        <li>Optional <strong>syntax highlighting</strong> (JS/TS, Python, JSON, CSS, HTML/XML, Bash, SQL, YAML, Go, Rust, Java, C#, C/C++, Markdown) layered underneath the diff coloring, so a changed token still shows both what it is and that it changed - line-by-line, so multi-line comments/strings aren't always recognized correctly</li>
+      </ul>
+
+      <h3 class="about-feature-heading">Folder Compare</h3>
+      <ul class="about-feature-list">
+        <li>Pick two local folders and diff them by relative path - everything stays in the browser, nothing uploads anywhere</li>
+        <li>Each file is classified <strong>added / removed / modified / unchanged</strong> using SHA-256 content hashing, not just name/size</li>
+        <li>Filter by status or search by path; click any row to expand it</li>
+        <li>Modified text files open in the same line-diff view as Text Compare; modified images get a side-by-side view plus a pixel-level difference overlay; other binary files report their size change</li>
+      </ul>
+
+      <h3 class="about-feature-heading">Save, share &amp; export</h3>
+      <ul class="about-feature-list">
+        <li>Save named comparisons as tabs (rename, duplicate, delete), with autosave of the current pair</li>
+        <li>Undo/redo across typing, paste, drag-drop, swap, clear, and load</li>
+        <li>Drag-and-drop a file onto either pane, or use the Paste button</li>
+        <li><strong>Copy Diff</strong>, <strong>Download .patch</strong>, a standalone shareable <strong>HTML Report</strong> - open it in a new tab or save it as a file - titled after the current saved tab when one's loaded, a <strong>Share Link</strong> (state encoded in the URL), and JSON <strong>Export/Import</strong></li>
+        <li>System, light, dark, and Vegas neon themes on the <strong>Theme</strong> button, following the system setting by default</li>
+      </ul>
+
+      <p class="about-copy">License: MIT. Includes <a href="https://prismjs.com" target="_blank" rel="noopener">Prism.js</a> (MIT License) for syntax highlighting, vendored locally in <code>vendor/prism/</code>.</p>
+
+      <table class="about-shortcuts"><tbody>
+        <tr><td><kbd class="shortcut">ctrl</kbd>+<kbd class="shortcut">enter</kbd></td><td>run compare</td></tr>
+        <tr><td><kbd class="shortcut">ctrl</kbd>+<kbd class="shortcut">s</kbd></td><td>save comparison</td></tr>
+        <tr><td><kbd class="shortcut">ctrl</kbd>+<kbd class="shortcut">z</kbd></td><td>undo last edit/paste/drag-drop/swap/clear/load</td></tr>
+        <tr><td><kbd class="shortcut">ctrl</kbd>+<kbd class="shortcut">shift</kbd>+<kbd class="shortcut">z</kbd> / <kbd class="shortcut">ctrl</kbd>+<kbd class="shortcut">y</kbd></td><td>redo</td></tr>
+        <tr><td><kbd class="shortcut">]</kbd> / <kbd class="shortcut">[</kbd></td><td>jump to next/previous change</td></tr>
+        <tr><td><kbd class="shortcut">alt</kbd>+<kbd class="shortcut">→</kbd> / <kbd class="shortcut">alt</kbd>+<kbd class="shortcut">←</kbd></td><td>copy the selected change to Version B/A (Split view)</td></tr>
+        <tr><td><kbd class="shortcut">b</kbd></td><td>bookmark/unbookmark the selected change</td></tr>
+        <tr><td><kbd class="shortcut">{</kbd> / <kbd class="shortcut">}</kbd></td><td>jump to previous/next bookmarked change</td></tr>
+      </tbody></table>
+      <div class="modal-actions"><span class="spacer"></span><button id="about-close-button" class="button primary" type="button">Close</button></div>
+    </section>
+  </dialog>
+
+  <div id="toast" class="toast" aria-live="polite"></div>
+
+  <!-- Prism.js (https://prismjs.com, MIT License) -- third-party syntax
+       tokenizer used for the optional per-language highlighting in the
+       diff view. Vendored locally in vendor/prism/ (never loaded from a
+       CDN) so nothing about "everything stays in the browser" changes;
+       see vendor/prism/LICENSE for the full license text. Delta supplies
+       its own token colors in style.css rather than a Prism theme, so
+       highlighted code matches the app's own light/dark palette. This is
+       the one deliberate exception to Delta's "zero dependencies" design
+       -- see the comment above SYNTAX_LANGUAGES in app.js for why. -->
+  <script src="vendor/prism/prism-core.min.js"></script>
+  <script src="vendor/prism/prism-clike.min.js"></script>
+  <script src="vendor/prism/prism-markup.min.js"></script>
+  <script src="vendor/prism/prism-css.min.js"></script>
+  <script src="vendor/prism/prism-javascript.min.js"></script>
+  <script src="vendor/prism/prism-typescript.min.js"></script>
+  <script src="vendor/prism/prism-json.min.js"></script>
+  <script src="vendor/prism/prism-python.min.js"></script>
+  <script src="vendor/prism/prism-bash.min.js"></script>
+  <script src="vendor/prism/prism-sql.min.js"></script>
+  <script src="vendor/prism/prism-yaml.min.js"></script>
+  <script src="vendor/prism/prism-go.min.js"></script>
+  <script src="vendor/prism/prism-rust.min.js"></script>
+  <script src="vendor/prism/prism-java.min.js"></script>
+  <script src="vendor/prism/prism-csharp.min.js"></script>
+  <script src="vendor/prism/prism-c.min.js"></script>
+  <script src="vendor/prism/prism-cpp.min.js"></script>
+  <script src="vendor/prism/prism-markdown.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
