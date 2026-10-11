@@ -1,4 +1,4 @@
-# Delta v1.0
+# Delta v1.1
 
 Delta is the local-first diff tool I wanted for comparing switch configs, firewall exports, and other text that should never be pasted into a website.
 
@@ -15,13 +15,15 @@ That storage is the only copy, so use **Export** now and then to keep a JSON bac
 - **Ignore lines matching (regex)**: add several patterns as removable pills, so timestamps, serial numbers, or `! Last configuration change` lines stop showing up as differences
 - **Base / 3-way** mode: compare A and B against a shared original, with a full 3-way merge that auto-merges one-sided changes and flags real conflicts for you to resolve
 - Copy-to-other-side arrows on each change in Split view, with undo
+- A change count next to the added and removed line counts, and an **expand all** link that opens every folded run of unchanged lines
 - `]` / `[` change navigation, bookmarks on changes, and per-pane find
 - **Live** mode (re-compare as you stop typing) and **Preview** mode (render HTML or Markdown)
 - **Whitespace** toggle that shows every space and tab
 - Optional syntax highlighting for JS/TS, Python, JSON, CSS, HTML/XML, Bash, SQL, YAML, Go, Rust, Java, C#, C/C++, and Markdown
-- **Folder Compare**: pick two local folders and see every file as added, removed, modified, or unchanged by SHA-256 content hash; modified text files open in the same diff view, and modified images get a pixel-difference overlay
-- Named saved comparisons as tabs, with autosave of the current pair and undo/redo across typing, paste, drop, swap, clear, and load
-- **Copy Diff**, **Download .patch**, a standalone light-themed **HTML Report**, a **Share Link** that carries the comparison in the URL, and JSON export/import
+- **Folder Compare**: pick two local folders and see every file as added, removed, modified, or unchanged by SHA-256 content hash; modified text files open in the same diff view, with an **Open in Text Compare** button for copy arrows, merge, and export; modified images get a pixel-difference overlay; **Copy Summary** copies the file list as text
+- **Open** a file into any pane, or drop one on it; a pane still carrying its default name takes the file's name, and dropping two files on a pane fills A and B at once. A banner says when the two files came in with different line endings
+- Named saved comparisons as tabs, including the Base pane when it is in use, with autosave of the current pair and undo/redo across typing, paste, drop, swap, clear, and load
+- **Copy Diff** and **Download .patch** as a real unified diff that applies with `patch -p0` or `git apply`, a standalone light-themed **HTML Report** with folded context behind click-to-open sections, a **Share Link** that carries the comparison in the URL, and JSON export/import
 - System, light, dark, and Vegas neon themes on the **Theme** button, following the system setting by default (Vegas motion stops when the system asks for reduced motion)
 - Adjustable text size and line/character counts per pane
 
@@ -43,6 +45,7 @@ Folder Compare needs a browser that supports picking a folder (current Chrome, E
 | `Alt+→` / `Alt+←` | Copy the selected change to Version B / A (Split view) |
 | `B` | Bookmark or unbookmark the selected change |
 | `}` / `{` | Jump to the next / previous bookmarked change |
+| `?` | Open the About dialog with the full feature and shortcut list |
 
 ## Third-party code
 
@@ -52,4 +55,4 @@ Syntax highlighting uses [Prism.js](https://prismjs.com) (MIT License), vendored
 
 MIT. See [`LICENSE`](LICENSE).
 
-I’m calling this release **v1.0**.
+The current release is **v1.1**. See [`CHANGELOG.md`](CHANGELOG.md) for what changed.

@@ -276,6 +276,8 @@
     .diff-stats { margin-left: auto; color: var(--muted); font-size: 11px; }
     .diff-stats .added { color: var(--add); font-weight: 700; }
     .diff-stats .removed { color: var(--danger); font-weight: 700; }
+    .diff-stats .stats-action { background: none; border: 0; padding: 0; margin: 0; font: inherit; color: var(--accent); cursor: pointer; text-decoration: underline dotted; }
+    .diff-stats .stats-action:hover { text-decoration-style: solid; }
 
     .diff-output {
       border: 1px solid var(--border); border-radius: 7px; background: color-mix(in srgb, var(--surface) 88%, var(--bg));
@@ -415,8 +417,9 @@
        margin-left:auto, soaking up whatever width the (now-shorter)
        input isn't using. */
     .pane-head { display: flex; gap: 6px; align-items: center; }
-    .pane-head .pane-title { flex: 1 1 auto; min-width: 0; max-width: calc(100% - 76px); }
-    .pane-paste { flex: 0 0 auto; margin-left: auto; padding: 7px 9px; font-size: 11px; color: var(--muted); }
+    .pane-head .pane-title { flex: 1 1 auto; min-width: 0; max-width: calc(100% - 132px); }
+    .pane-paste { flex: 0 0 auto; padding: 7px 9px; font-size: 11px; color: var(--muted); }
+    .pane-head .pane-title + .pane-paste { margin-left: auto; }
     .pane.drag-over textarea { border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 25%, transparent); }
 
     .pane-search { display: flex; align-items: center; gap: 6px; }
@@ -515,6 +518,8 @@
     .folder-diff-row-detail:last-child { border-bottom: 0; }
     .folder-diff-row-detail .diff-output { border: 0; border-radius: 0; max-height: 420px; }
     .folder-diff-row-detail-empty { padding: 14px; font-size: 12px; color: var(--muted); }
+    .folder-diff-row-detail-actions { display: flex; justify-content: flex-end; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+    .folder-diff-row-detail-actions .button { padding: 6px 10px; font-size: 11px; }
     .folder-image-diff { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1px; background: var(--border); }
     .folder-image-diff-cell { background: var(--surface); padding: 10px; display: flex; flex-direction: column; gap: 6px; align-items: center; min-width: 0; }
     .folder-image-diff-cell h4 { margin: 0; font-size: 10.5px; text-transform: uppercase; letter-spacing: .03em; color: var(--muted); font-weight: 600; }

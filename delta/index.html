@@ -16,13 +16,13 @@
   <meta name="color-scheme" content="dark light">
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='13' fill='%23101311'/%3E%3Crect x='3' y='3' width='58' height='58' rx='11' fill='none' stroke='%23364038' stroke-width='2'/%3E%3Cpath d='M32 13 L51 47 L13 47 Z' fill='none' stroke='%238cd3a0' stroke-width='6' stroke-linejoin='miter'/%3E%3C/svg%3E">
   <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='13' fill='%23101311'/%3E%3Crect x='3' y='3' width='58' height='58' rx='11' fill='none' stroke='%23364038' stroke-width='2'/%3E%3Cpath d='M32 13 L51 47 L13 47 Z' fill='none' stroke='%238cd3a0' stroke-width='6' stroke-linejoin='miter'/%3E%3C/svg%3E">
-  <title>Delta v1.0 - Local Diff / Compare</title>
+  <title>Delta v1.1 - Local Diff / Compare</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <main class="app">
     <header class="topbar">
-      <div class="brand"><h1>delta</h1><span class="tagline">v1.0 · local diff / compare · zero dependencies</span><span id="save-indicator" class="save-indicator" title="Saved locally" aria-label="Saved locally">●</span></div>
+      <div class="brand"><h1>delta</h1><span class="tagline">v1.1 · local diff / compare · zero dependencies</span><span id="save-indicator" class="save-indicator" title="Saved locally" aria-label="Saved locally">●</span></div>
       <nav class="toolbar" aria-label="Controls">
         <div class="font-size-control" role="group" aria-label="Text size">
           <button class="icon-button" id="font-size-down" type="button" title="Smaller text" aria-label="Decrease text size">A−</button>
@@ -32,6 +32,7 @@
         <button class="button" id="export-button" type="button">Export</button>
         <button class="button" id="import-button" type="button">Import</button>
         <input id="import-file" type="file" accept="application/json,.json" hidden>
+        <input id="open-file" type="file" hidden>
         <button class="button" id="about-button" type="button">About</button>
       </nav>
     </header>
@@ -96,6 +97,7 @@
       <div class="pane" style="grid-column: 1 / -1;" data-pane="base">
         <div class="pane-head">
           <input class="pane-title" id="label-base" maxlength="80" placeholder="Base / Original" value="Base">
+          <button class="button pane-paste" type="button" data-open="text-base" title="Open a text file from this computer into this pane">Open</button>
           <button class="button pane-paste" type="button" data-paste="text-base">Paste</button>
         </div>
         <div class="pane-search">
@@ -117,6 +119,7 @@
       <div class="pane" data-pane="a">
         <div class="pane-head">
           <input class="pane-title" id="label-a" maxlength="80" placeholder="Version A" value="Version A">
+          <button class="button pane-paste" type="button" data-open="text-a" title="Open a text file from this computer into this pane. Drop two files on a pane to fill A and B at once.">Open</button>
           <button class="button pane-paste" type="button" data-paste="text-a">Paste</button>
         </div>
         <div class="pane-search">
@@ -135,6 +138,7 @@
       <div class="pane" data-pane="b">
         <div class="pane-head">
           <input class="pane-title" id="label-b" maxlength="80" placeholder="Version B" value="Version B">
+          <button class="button pane-paste" type="button" data-open="text-b" title="Open a text file from this computer into this pane. Drop two files on a pane to fill A and B at once.">Open</button>
           <button class="button pane-paste" type="button" data-paste="text-b">Paste</button>
         </div>
         <div class="pane-search">
@@ -230,6 +234,7 @@
 
       <div class="folder-diff-actions">
         <button class="button primary" type="button" id="folder-compare-button" disabled>Compare Folders</button>
+        <button class="button" type="button" id="folder-copy-summary-button" title="Copy the file list below (as filtered) to the clipboard as text" hidden>Copy Summary</button>
         <span class="folder-diff-summary" id="folder-diff-summary"></span>
       </div>
 
@@ -250,12 +255,12 @@
       <div class="folder-diff-list" id="folder-diff-list"></div>
     </div>
 
-    <footer class="footer"><span><strong>delta</strong> · local-first diff &amp; compare, no accounts, nothing leaves the browser · <button class="button" id="about-button-2" type="button">About</button></span><span><kbd class="shortcut">ctrl</kbd>+<kbd class="shortcut">enter</kbd> compare · <kbd class="shortcut">ctrl</kbd>+<kbd class="shortcut">s</kbd> save · <kbd class="shortcut">ctrl</kbd>+<kbd class="shortcut">z</kbd> undo · <kbd class="shortcut">ctrl</kbd>+<kbd class="shortcut">shift</kbd>+<kbd class="shortcut">z</kbd> redo · <kbd class="shortcut">]</kbd>/<kbd class="shortcut">[</kbd> next/prev change · <kbd class="shortcut">alt</kbd>+<kbd class="shortcut">→</kbd>/<kbd class="shortcut">←</kbd> copy change</span></footer>
+    <footer class="footer"><span><strong>delta</strong> · local-first diff &amp; compare, no accounts, nothing leaves the browser · <button class="button" id="about-button-2" type="button">About</button></span><span><kbd class="shortcut">ctrl</kbd>+<kbd class="shortcut">enter</kbd> compare · <kbd class="shortcut">ctrl</kbd>+<kbd class="shortcut">s</kbd> save · <kbd class="shortcut">ctrl</kbd>+<kbd class="shortcut">z</kbd> undo · <kbd class="shortcut">ctrl</kbd>+<kbd class="shortcut">shift</kbd>+<kbd class="shortcut">z</kbd> redo · <kbd class="shortcut">]</kbd>/<kbd class="shortcut">[</kbd> next/prev change · <kbd class="shortcut">alt</kbd>+<kbd class="shortcut">→</kbd>/<kbd class="shortcut">←</kbd> copy change · <kbd class="shortcut">?</kbd> help</span></footer>
   </main>
 
   <dialog id="about-dialog" aria-labelledby="about-dialog-title">
     <section class="modal-form">
-      <h2 class="modal-heading" id="about-dialog-title">delta v1.0_</h2>
+      <h2 class="modal-heading" id="about-dialog-title">delta v1.1_</h2>
       <p class="about-copy"><strong>A local-first diff &amp; compare tool.</strong> Delta stores your saved comparisons in this browser's local storage. No account, network connection, or server is required. One optional feature (syntax highlighting) bundles a small third-party library, vendored locally rather than loaded from a CDN - everything else is still hand-written with zero dependencies.</p>
 
       <h3 class="about-feature-heading">Text Compare</h3>
@@ -280,15 +285,16 @@
         <li>Pick two local folders and diff them by relative path - everything stays in the browser, nothing uploads anywhere</li>
         <li>Each file is classified <strong>added / removed / modified / unchanged</strong> using SHA-256 content hashing, not just name/size</li>
         <li>Filter by status or search by path; click any row to expand it</li>
-        <li>Modified text files open in the same line-diff view as Text Compare; modified images get a side-by-side view plus a pixel-level difference overlay; other binary files report their size change</li>
+        <li>Modified text files open in the same line-diff view as Text Compare, with a button to send the pair to Text Compare for copy arrows, merge, and export; modified images get a side-by-side view plus a pixel-level difference overlay; other binary files report their size change</li>
+        <li><strong>Copy Summary</strong> copies the file list, as filtered, as plain text</li>
       </ul>
 
       <h3 class="about-feature-heading">Save, share &amp; export</h3>
       <ul class="about-feature-list">
-        <li>Save named comparisons as tabs (rename, duplicate, delete), with autosave of the current pair</li>
+        <li>Save named comparisons as tabs (rename, duplicate, delete), including the Base pane when it is in use, with autosave of the current pair</li>
         <li>Undo/redo across typing, paste, drag-drop, swap, clear, and load</li>
-        <li>Drag-and-drop a file onto either pane, or use the Paste button</li>
-        <li><strong>Copy Diff</strong>, <strong>Download .patch</strong>, a standalone shareable <strong>HTML Report</strong> - open it in a new tab or save it as a file - titled after the current saved tab when one's loaded, a <strong>Share Link</strong> (state encoded in the URL), and JSON <strong>Export/Import</strong></li>
+        <li>Open a file into a pane with its <strong>Open</strong> button, drag-and-drop one onto it, or use the Paste button; a pane still carrying its default name takes the file's name, and dropping two files on a pane fills A and B at once</li>
+        <li><strong>Copy Diff</strong> and <strong>Download .patch</strong> as a real unified diff that applies with <code>patch</code> or <code>git apply</code>, a standalone shareable <strong>HTML Report</strong> - open it in a new tab or save it as a file - titled after the current saved tab when one's loaded, a <strong>Share Link</strong> (state encoded in the URL), and JSON <strong>Export/Import</strong></li>
         <li>System, light, dark, and Vegas neon themes on the <strong>Theme</strong> button, following the system setting by default</li>
       </ul>
 
@@ -303,6 +309,7 @@
         <tr><td><kbd class="shortcut">alt</kbd>+<kbd class="shortcut">→</kbd> / <kbd class="shortcut">alt</kbd>+<kbd class="shortcut">←</kbd></td><td>copy the selected change to Version B/A (Split view)</td></tr>
         <tr><td><kbd class="shortcut">b</kbd></td><td>bookmark/unbookmark the selected change</td></tr>
         <tr><td><kbd class="shortcut">{</kbd> / <kbd class="shortcut">}</kbd></td><td>jump to previous/next bookmarked change</td></tr>
+        <tr><td><kbd class="shortcut">?</kbd></td><td>open this dialog</td></tr>
       </tbody></table>
       <div class="modal-actions"><span class="spacer"></span><button id="about-close-button" class="button primary" type="button">Close</button></div>
     </section>

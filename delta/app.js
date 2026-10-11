@@ -303,14 +303,66 @@
       }
       function testIgnore(regex, line) { try { return regex.test(line); } catch (e) { return false; } }
       function testIgnoreAny(regexes, line) { return regexes.some(re => testIgnore(re, line)); }
-      function buildUnifiedText(ops, labelA, labelB) {
-        const lines = [`--- ${labelA}`, `+++ ${labelB}`];
+      // A real unified diff (single-character prefixes, @@ hunk headers,
+      // three lines of context, "\ No newline at end of file"), so the
+      // .patch download applies cleanly with patch -p0 or git apply
+      // instead of only reading like one. The ops come from splitting on
+      // newlines, so a text that ends with a newline contributes one
+      // trailing empty "line" that no patch tool expects to see; those
+      // phantom lines are dropped here, and a side whose text does NOT
+      // end with a newline gets the marker after its last line instead.
+      const PATCH_CONTEXT = 3;
+      function buildUnifiedText(ops, labelA, labelB, rawTextA, rawTextB) {
+        // An empty text has no lines at all, so its one split "line" is
+        // phantom too, exactly like the trailing-newline case.
+        const aTrail = /\n$/.test(rawTextA) || rawTextA === '', bTrail = /\n$/.test(rawTextB) || rawTextB === '';
+        const nA = ops.filter(o => o.type !== 'add').length, nB = ops.filter(o => o.type !== 'del').length;
+        const emitted = [];
+        let ia = 0, ib = 0;
+        const push = (kind, text, side, idx) => {
+          const last = side === 'a' ? idx === nA - 1 : idx === nB - 1;
+          const trail = side === 'a' ? aTrail : bTrail;
+          emitted.push({ kind, text, noNewline: last && !trail });
+        };
         ops.forEach(op => {
-          if (op.type === 'equal') lines.push('  ' + op.a);
-          else if (op.type === 'del') lines.push('- ' + op.a);
-          else lines.push('+ ' + op.b);
+          if (op.type === 'equal') {
+            const phantomA = aTrail && ia === nA - 1, phantomB = bTrail && ib === nB - 1;
+            const lastNoNlA = !aTrail && ia === nA - 1, lastNoNlB = !bTrail && ib === nB - 1;
+            if (phantomA && phantomB) { /* both sides' trailing newline */ }
+            else if (phantomA) push('+', op.b, 'b', ib);
+            else if (phantomB) push('-', op.a, 'a', ia);
+            else if (lastNoNlA !== lastNoNlB) { push('-', op.a, 'a', ia); push('+', op.b, 'b', ib); }
+            else emitted.push({ kind: ' ', text: op.a, noNewline: lastNoNlA });
+            ia++; ib++;
+          } else if (op.type === 'del') {
+            if (!(aTrail && ia === nA - 1)) push('-', op.a, 'a', ia);
+            ia++;
+          } else {
+            if (!(bTrail && ib === nB - 1)) push('+', op.b, 'b', ib);
+            ib++;
+          }
         });
-        return lines.join('\n');
+        const out = [`--- ${labelA}`, `+++ ${labelB}`];
+        const changed = emitted.map((l, i) => l.kind === ' ' ? -1 : i).filter(i => i >= 0);
+        let aNo = 0, bNo = 0, cursor = 0;
+        const advance = upTo => { for (; cursor < upTo; cursor++) { const k = emitted[cursor].kind; if (k !== '+') aNo++; if (k !== '-') bNo++; } };
+        let ci = 0;
+        while (ci < changed.length) {
+          const start = Math.max(0, changed[ci] - PATCH_CONTEXT);
+          let end = changed[ci] + PATCH_CONTEXT + 1;
+          while (ci + 1 < changed.length && changed[ci + 1] - PATCH_CONTEXT <= end) { ci++; end = changed[ci] + PATCH_CONTEXT + 1; }
+          ci++;
+          end = Math.min(emitted.length, end);
+          advance(start);
+          const hunk = emitted.slice(start, end);
+          const aCount = hunk.filter(l => l.kind !== '+').length, bCount = hunk.filter(l => l.kind !== '-').length;
+          const aStart = aCount ? aNo + 1 : aNo, bStart = bCount ? bNo + 1 : bNo;
+          const range = (s, c) => c === 1 ? String(s) : `${s},${c}`;
+          out.push(`@@ -${range(aStart, aCount)} +${range(bStart, bCount)} @@`);
+          hunk.forEach(l => { out.push(l.kind + l.text); if (l.noNewline) out.push('\\ No newline at end of file'); });
+          advance(end);
+        }
+        return out.join('\n') + '\n';
       }
       function diffLinesDisplay(rawA, rawB, normA, normB) {
         const ops = diffLines(normA, normB);
@@ -458,12 +510,17 @@
       function sortedSaved() {
         return [...saved].sort((x, y) => (y.pinned === x.pinned) ? 0 : (y.pinned ? 1 : -1));
       }
+      function savedTabTooltip(item) {
+        const when = item.updatedAt ? new Date(item.updatedAt) : null;
+        const stamp = when && !Number.isNaN(when.getTime()) ? ' · updated ' + when.toLocaleString() : '';
+        return 'Click to load, double-click to rename' + stamp + (item.textBase ? ' · 3-way' : '');
+      }
       function renderSavedBar() {
         const items = sortedSaved();
         savedBar.innerHTML = items.map(item => `<span class="saved-tab ${item.pinned ? 'pinned' : ''} ${item.id === currentSavedId ? 'active' : ''}" draggable="true" data-id="${esc(item.id)}">` +
           `<button class="saved-pin" type="button" data-pin="${esc(item.id)}" title="${item.pinned ? 'Unpin' : 'Pin'}">${item.pinned ? '★' : '☆'}</button>` +
           `<span class="saved-dirty" title="Unsaved changes" ${item.id === currentSavedId && isCurrentDirty() ? '' : 'hidden'}>●</span>` +
-          `<span class="saved-name" data-load="${esc(item.id)}" title="Click to load, double-click to rename">${esc(item.name)}</span>` +
+          `<span class="saved-name" data-load="${esc(item.id)}" title="${esc(savedTabTooltip(item))}">${esc(item.name)}</span>` +
           `<button class="saved-rename" type="button" data-rename="${esc(item.id)}" title="Rename">✎</button>` +
           `<button class="saved-dup" type="button" data-dup="${esc(item.id)}" title="Duplicate">⧉</button>` +
           `<button class="saved-remove" type="button" data-remove="${esc(item.id)}" title="Delete">×</button>` +
@@ -473,14 +530,35 @@
       // what was last saved under it (or, with nothing loaded, when the
       // panes have unsaved content at all) -- drives both the tab dot and
       // the discard-confirmation before switching away.
+      // The Base pane is part of a saved comparison too (a 3-way compare
+      // is useless without its original), so these two helpers are the
+      // single place that decides which fields a saved item carries and
+      // how they get back into the panes. Items saved before the Base
+      // pane was stored simply load with it hidden and empty.
+      function panesToSavedFields() {
+        return {
+          textA: textA.value, textB: textB.value, labelA: labelAInput.value, labelB: labelBInput.value,
+          textBase: textBase.value, labelBase: labelBaseInput.value, baseShown: !basePaneRowEl.hidden,
+        };
+      }
+      function savedFieldsToPanes(item) {
+        textA.value = item.textA; textB.value = item.textB;
+        labelAInput.value = item.labelA || 'Version A'; labelBInput.value = item.labelB || 'Version B';
+        textBase.value = item.textBase || ''; labelBaseInput.value = item.labelBase || 'Base';
+        paneLineEndings['text-a'] = item.lineEndingsA || 'none'; paneLineEndings['text-b'] = item.lineEndingsB || 'none'; paneLineEndings['text-base'] = 'none';
+        const showBase = !!item.baseShown;
+        basePaneRowEl.hidden = !showBase; baseToggleEl.classList.toggle('active', showBase);
+      }
       function isCurrentDirty() {
         if (currentSavedId) {
           const item = saved.find(s => s.id === currentSavedId);
           if (!item) return false;
           return item.textA !== textA.value || item.textB !== textB.value ||
-            (item.labelA || 'Version A') !== labelAInput.value || (item.labelB || 'Version B') !== labelBInput.value;
+            (item.labelA || 'Version A') !== labelAInput.value || (item.labelB || 'Version B') !== labelBInput.value ||
+            (item.textBase || '') !== textBase.value || (item.labelBase || 'Base') !== labelBaseInput.value ||
+            !!item.baseShown !== !basePaneRowEl.hidden;
         }
-        return !!(textA.value || textB.value);
+        return !!(textA.value || textB.value || textBase.value);
       }
       function confirmDiscardIfDirty(actionLabel) {
         if (!isCurrentDirty()) return true;
@@ -521,10 +599,9 @@
         const item = saved.find(s => s.id === id);
         if (!item) return;
         if (!confirmDiscardIfDirty('Loading "' + item.name + '"')) return;
-        if (textA.value || textB.value) pushUndo();
+        if (textA.value || textB.value || textBase.value) pushUndo();
         currentSavedId = id;
-        textA.value = item.textA; textB.value = item.textB;
-        labelAInput.value = item.labelA || 'Version A'; labelBInput.value = item.labelB || 'Version B';
+        savedFieldsToPanes(item);
         renderSavedBar(); runCompare(); saveCurrent();
         flash('Loaded "' + item.name + '"');
       }
@@ -535,8 +612,7 @@
         const copy = { ...item, id: makeId(), name: (item.name + ' (copy)').slice(0, 80), pinned: false, updatedAt: new Date().toISOString() };
         saved.splice(saved.findIndex(s => s.id === id) + 1, 0, copy);
         currentSavedId = copy.id;
-        textA.value = copy.textA; textB.value = copy.textB;
-        labelAInput.value = copy.labelA || 'Version A'; labelBInput.value = copy.labelB || 'Version B';
+        savedFieldsToPanes(copy);
         saveSaved(); renderSavedBar(); runCompare(); saveCurrent();
         flash('Duplicated "' + item.name + '"');
         startRenameTab(copy.id);
@@ -587,7 +663,7 @@
       // same inline rename used elsewhere, instead of a blocking prompt().
       function promptSaveAsNew() {
         const suggestion = (labelAInput.value || 'Comparison') + ' vs ' + (labelBInput.value || 'B');
-        const item = { id: makeId(), name: suggestion.slice(0, 80), textA: textA.value, textB: textB.value, labelA: labelAInput.value, labelB: labelBInput.value, pinned: false, updatedAt: new Date().toISOString() };
+        const item = { id: makeId(), name: suggestion.slice(0, 80), ...panesToSavedFields(), pinned: false, updatedAt: new Date().toISOString() };
         saved.push(item); currentSavedId = item.id;
         saveSaved(); renderSavedBar(); saveCurrent();
         flash('Saved "' + item.name + '"');
@@ -599,12 +675,13 @@
       // a blocking prompt().
       function createFreshComparison() {
         if (!confirmDiscardIfDirty('Creating a new comparison')) return;
-        const item = { id: makeId(), name: 'New comparison', textA: '', textB: '', labelA: 'Version A', labelB: 'Version B', pinned: false, updatedAt: new Date().toISOString() };
+        const item = { id: makeId(), name: 'New comparison', textA: '', textB: '', labelA: 'Version A', labelB: 'Version B', textBase: '', labelBase: 'Base', baseShown: false, pinned: false, updatedAt: new Date().toISOString() };
         saved.push(item); currentSavedId = item.id;
 
         if (textA.value || textB.value || textBase.value) pushUndo();
         textA.value = ''; textB.value = ''; labelAInput.value = 'Version A'; labelBInput.value = 'Version B';
         textBase.value = ''; labelBaseInput.value = 'Base';
+        paneLineEndings['text-a'] = 'none'; paneLineEndings['text-b'] = 'none'; paneLineEndings['text-base'] = 'none';
         basePaneRowEl.hidden = true; baseToggleEl.classList.remove('active');
         lastOps = null; lastOpsBaseA = null; lastOpsBaseB = null;
         diffOutput.style.display = ''; diffOutput.className = 'diff-output';
@@ -625,7 +702,7 @@
         if (currentSavedId) {
           const item = saved.find(s => s.id === currentSavedId);
           if (item) {
-            item.textA = textA.value; item.textB = textB.value; item.labelA = labelAInput.value; item.labelB = labelBInput.value; item.updatedAt = new Date().toISOString();
+            Object.assign(item, panesToSavedFields(), { updatedAt: new Date().toISOString() });
             saveSaved(); renderSavedBar(); saveCurrent();
             flash('Updated "' + item.name + '"');
             return;
@@ -736,25 +813,25 @@
         return applyIgnorePattern(ops, opts.ignoreRegexes);
       }
 
+      // A textarea's value never contains CR: the browser normalizes
+      // every CRLF and CR to LF on the way in, for typed, pasted, and
+      // assigned text alike. So the line endings of what was loaded can
+      // only be known at the moment it comes in (a file opened or dropped,
+      // the Paste button's clipboard text, a folder-compare file), and
+      // they are remembered here per pane. 'none' means nothing is known,
+      // which is also what typing or loading a saved tab resets to.
+      const paneLineEndings = { 'text-a': 'none', 'text-b': 'none', 'text-base': 'none' };
+      function rememberLineEndings(targetId, rawText) { paneLineEndings[targetId] = detectLineEndings(rawText); }
       function updateLineEndingBanner() {
-        const endA = detectLineEndings(textA.value), endB = detectLineEndings(textB.value);
+        const endA = paneLineEndings['text-a'], endB = paneLineEndings['text-b'];
         if (endA !== 'none' && endB !== 'none' && endA !== endB) {
           lineendingBannerEl.hidden = false;
-          lineendingBannerEl.innerHTML = `<span>⚠ ${esc(labelAInput.value || 'Version A')} uses <strong>${endA}</strong> line endings, ${esc(labelBInput.value || 'Version B')} uses <strong>${endB}</strong> -- lines that look identical may still show as changed.</span>` +
-            `<button type="button" class="button" data-normalize-eol title="Convert both sides to LF line endings">Normalize to LF</button>`;
+          lineendingBannerEl.innerHTML = `<span>⚠ ${esc(labelAInput.value || 'Version A')} came in with <strong>${endA}</strong> line endings and ${esc(labelBInput.value || 'Version B')} with <strong>${endB}</strong>. Delta compares both as LF, so that difference is not shown here; the patch and merged result use LF too.</span>`;
         } else {
           lineendingBannerEl.hidden = true;
           lineendingBannerEl.innerHTML = '';
         }
       }
-      lineendingBannerEl.addEventListener('click', event => {
-        if (!event.target.closest('[data-normalize-eol]')) return;
-        pushUndo();
-        const toLF = s => s.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-        textA.value = toLF(textA.value); textB.value = toLF(textB.value);
-        flash('Normalized to LF');
-        runCompare();
-      });
       // "Pretty-print JSON" silently falls back to a plain text diff when a
       // side doesn't actually parse as JSON -- flag that so it doesn't read
       // as a structural JSON diff when it isn't one.
@@ -1147,7 +1224,6 @@
         const middle = sourceLines.slice(sourceStart - 1, sourceStart - 1 + sourceLen);
         return before.concat(middle, after);
       }
-      function eolFor(text) { return detectLineEndings(text) === 'CRLF' ? '\r\n' : '\n'; }
       // After a copy, the whole diff re-renders from scratch (line numbers
       // shift, folds can open/close), so there's nothing linking "the block
       // that just vanished on one side" to "the block that just appeared
@@ -1180,13 +1256,13 @@
         const aLines = splitRawLines(textA.value), bLines = splitRawLines(textB.value);
         pushUndo();
         if (dir === 'a-to-b') {
-          textB.value = spliceGroupInto(aLines, aStart, aLen, bLines, bStart, bLen).join(eolFor(textB.value));
+          textB.value = spliceGroupInto(aLines, aStart, aLen, bLines, bStart, bLen).join('\n');
           textB.dispatchEvent(new Event('input'));
           flash('Copied to ' + (labelBInput.value || 'Version B'));
           runCompare();
           flashCopiedRange('b', bStart, aLen);
         } else {
-          textA.value = spliceGroupInto(bLines, bStart, bLen, aLines, aStart, aLen).join(eolFor(textA.value));
+          textA.value = spliceGroupInto(bLines, bStart, bLen, aLines, aStart, aLen).join('\n');
           textA.dispatchEvent(new Event('input'));
           flash('Copied to ' + (labelAInput.value || 'Version A'));
           runCompare();
@@ -1212,7 +1288,11 @@
         const added = ops.filter(o => o.type === 'add' && !o.ignored).length;
         const removed = ops.filter(o => o.type === 'del' && !o.ignored).length;
         const unchanged = ops.filter(o => o.type === 'equal' || o.ignored).length;
-        diffStats.innerHTML = `<span class="added">+${added}</span> <span class="removed">-${removed}</span> · ${unchanged} unchanged`;
+        // Contiguous blocks of change, counting a block only when at least
+        // one of its lines is not ignored: the same thing the copy arrows
+        // and the ]/[ toast call a change, just as one number.
+        const blocks = groupOps(ops).filter(g => g.type === 'change' && (g.dels.some(d => !d.ignored) || g.adds.some(a => !a.ignored))).length;
+        diffStats.innerHTML = `<span class="added">+${added}</span> <span class="removed">-${removed}</span> · ${blocks} change${blocks === 1 ? '' : 's'} · ${unchanged} unchanged`;
         diffPanelsEl.innerHTML = '';
         if (baseModeActive()) {
           diffPanelsEl.appendChild(buildDiffPanel('Base → ' + (labelAInput.value || 'Version A'), lastOpsBaseA));
@@ -1225,7 +1305,25 @@
           renderDiffSection(ops, diffOutput, true);
           mergePanelEl.hidden = true;
         }
+        if (Object.keys(foldStore).length) {
+          diffStats.insertAdjacentHTML('beforeend', ' · <button type="button" class="stats-action" id="expand-all-folds" title="Show every folded run of unchanged lines">expand all</button>');
+        }
       }
+      // Opens every fold in the text compare at once (the main diff and
+      // both 3-way panels), for reading a change in its full context or
+      // printing the page whole.
+      diffStats.addEventListener('click', event => {
+        const btn = event.target.closest('#expand-all-folds');
+        if (!btn) return;
+        textModePanelEl.querySelectorAll('[data-fold]').forEach(fold => {
+          const html = foldStore[fold.dataset.fold];
+          if (html == null) return;
+          fold.insertAdjacentHTML('afterend', html);
+          fold.remove();
+        });
+        btn.previousSibling.remove();
+        btn.remove();
+      });
       function buildDiffPanel(title, panelOps) {
         const wrap = document.createElement('div');
         wrap.className = 'diff-panel';
@@ -1451,10 +1549,11 @@
       const undoStack = [], redoStack = [];
       const UNDO_MAX = 20;
       function snapshotState() {
-        return { textA: textA.value, textB: textB.value, labelA: labelAInput.value, labelB: labelBInput.value, textBase: textBase.value, labelBase: labelBaseInput.value };
+        return { textA: textA.value, textB: textB.value, labelA: labelAInput.value, labelB: labelBInput.value, textBase: textBase.value, labelBase: labelBaseInput.value, lineEndings: { ...paneLineEndings } };
       }
       function applySnapshot(snap) {
         textA.value = snap.textA; textB.value = snap.textB;
+        if (snap.lineEndings) Object.assign(paneLineEndings, snap.lineEndings);
         labelAInput.value = snap.labelA; labelBInput.value = snap.labelB;
         textBase.value = snap.textBase; labelBaseInput.value = snap.labelBase;
       }
@@ -1491,6 +1590,7 @@
         pushUndo();
         const va = textA.value, vb = textB.value, la = labelAInput.value, lb = labelBInput.value;
         textA.value = vb; textB.value = va; labelAInput.value = lb; labelBInput.value = la;
+        [paneLineEndings['text-a'], paneLineEndings['text-b']] = [paneLineEndings['text-b'], paneLineEndings['text-a']];
         if (lastOps) runCompare(); else saveCurrent();
         flash('Swapped A and B');
       });
@@ -1498,6 +1598,7 @@
         if (textA.value || textB.value || textBase.value) pushUndo();
         textA.value = ''; textB.value = ''; labelAInput.value = 'Version A'; labelBInput.value = 'Version B';
         textBase.value = ''; labelBaseInput.value = 'Base';
+        paneLineEndings['text-a'] = 'none'; paneLineEndings['text-b'] = 'none'; paneLineEndings['text-base'] = 'none';
         currentSavedId = null; lastOps = null; lastOpsBaseA = null; lastOpsBaseB = null;
         diffOutput.style.display = ''; diffOutput.className = 'diff-output';
         diffOutput.innerHTML = '<div class="diff-empty">Paste two versions above and click Compare (or press <span class="shortcut">ctrl</span>+<span class="shortcut">enter</span>).</div>';
@@ -1512,12 +1613,12 @@
       });
       $('copy-diff-button').addEventListener('click', async () => {
         if (!lastOps) { flash('Nothing to copy yet -- run Compare first'); return; }
-        const text = buildUnifiedText(lastOps, labelAInput.value || 'Version A', labelBInput.value || 'Version B');
+        const text = buildUnifiedText(lastOps, labelAInput.value || 'Version A', labelBInput.value || 'Version B', effectiveText(textA.value), effectiveText(textB.value));
         try { await navigator.clipboard.writeText(text); flash('Diff copied'); } catch (e) { flash('Copy failed'); }
       });
       $('download-diff-button').addEventListener('click', () => {
         if (!lastOps) { flash('Nothing to download yet -- run Compare first'); return; }
-        const text = buildUnifiedText(lastOps, labelAInput.value || 'Version A', labelBInput.value || 'Version B');
+        const text = buildUnifiedText(lastOps, labelAInput.value || 'Version A', labelBInput.value || 'Version B', effectiveText(textA.value), effectiveText(textB.value));
         const slug = s => (s || '').trim().replace(/[^\w.-]+/g, '_').slice(0, 40);
         const filename = [slug(labelAInput.value) || 'a', slug(labelBInput.value) || 'b'].join('_vs_') + '.patch';
         const blob = new Blob([text], { type: 'text/x-patch' });
@@ -1542,6 +1643,7 @@
           try {
             const text = await navigator.clipboard.readText();
             pushUndo();
+            rememberLineEndings(btn.dataset.paste, text);
             target.value = text; target.dispatchEvent(new Event('input'));
             flash('Pasted');
           } catch (e) { flash('Clipboard access denied -- paste manually with ctrl+v'); }
@@ -1646,19 +1748,64 @@
       }
       ['text-a', 'text-b', 'text-base'].forEach(wireTextareaSearch);
 
-      /* ── Drag-and-drop a file onto a pane ────────────────────────── */
+      /* ── Open a file into a pane (Open button or drag-and-drop) ────
+         One loader for both paths. A pane whose title is still the
+         default ("Version A", "Version B", "Base", or blank) takes the
+         file's name, which is what a label is for when the inputs are
+         files; a title someone typed is left alone. Dropping two files on
+         any pane fills A and B at once, in the order they were dropped,
+         as one undo step. ── */
+      const PANE_LABEL_INPUTS = { 'text-base': labelBaseInput, 'text-a': labelAInput, 'text-b': labelBInput };
+      const PANE_DEFAULT_LABELS = { 'text-base': 'Base', 'text-a': 'Version A', 'text-b': 'Version B' };
+      function labelIsDefault(targetId) {
+        const value = PANE_LABEL_INPUTS[targetId].value.trim();
+        return value === '' || value === PANE_DEFAULT_LABELS[targetId];
+      }
+      function putFileInPane(file, targetId) {
+        return new Promise(resolve => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            const target = $(targetId);
+            rememberLineEndings(targetId, reader.result);
+            target.value = reader.result; target.dispatchEvent(new Event('input'));
+            if (labelIsDefault(targetId)) { PANE_LABEL_INPUTS[targetId].value = file.name.slice(0, 80); PANE_LABEL_INPUTS[targetId].dispatchEvent(new Event('input')); }
+            resolve(true);
+          };
+          reader.onerror = () => resolve(false);
+          reader.readAsText(file);
+        });
+      }
+      async function openFilesIntoPanes(files, targetId) {
+        const list = Array.from(files || []);
+        if (!list.length) return;
+        pushUndo();
+        if (list.length === 1) {
+          if (await putFileInPane(list[0], targetId)) flash('Loaded ' + list[0].name);
+          else flash('Could not read ' + list[0].name);
+          return;
+        }
+        const okA = await putFileInPane(list[0], 'text-a');
+        const okB = await putFileInPane(list[1], 'text-b');
+        if (okA && okB) flash('Loaded ' + list[0].name + ' into A and ' + list[1].name + ' into B');
+        else flash('Could not read one of the files');
+        if (liveMode) scheduleLiveCompare(); else if (textA.value && textB.value) runCompare();
+      }
+      const openFileInput = $('open-file');
+      let openFileTarget = 'text-a';
+      document.querySelectorAll('[data-open]').forEach(btn => {
+        btn.addEventListener('click', () => { openFileTarget = btn.dataset.open; openFileInput.multiple = openFileTarget !== 'text-base'; openFileInput.click(); });
+      });
+      openFileInput.addEventListener('change', () => {
+        openFilesIntoPanes(openFileInput.files, openFileTarget);
+        openFileInput.value = '';
+      });
       document.querySelectorAll('.pane[data-pane]').forEach(paneEl => {
         const targetId = { base: 'text-base', a: 'text-a', b: 'text-b' }[paneEl.dataset.pane];
-        const target = $(targetId);
         paneEl.addEventListener('dragover', event => { event.preventDefault(); paneEl.classList.add('drag-over'); });
         paneEl.addEventListener('dragleave', event => { if (!paneEl.contains(event.relatedTarget)) paneEl.classList.remove('drag-over'); });
         paneEl.addEventListener('drop', event => {
           event.preventDefault(); paneEl.classList.remove('drag-over');
-          const file = event.dataTransfer.files && event.dataTransfer.files[0];
-          if (!file) return;
-          const reader = new FileReader();
-          reader.onload = () => { pushUndo(); target.value = reader.result; target.dispatchEvent(new Event('input')); flash('Loaded ' + file.name); };
-          reader.readAsText(file);
+          openFilesIntoPanes(event.dataTransfer.files, targetId);
         });
       });
 
@@ -1779,6 +1926,22 @@
       function reportBodyHtml(sourceEl) {
         const clone = sourceEl.cloneNode(true);
         clone.querySelectorAll('.diff-group-actions').forEach(el => el.remove());
+        // Folded context lives in foldStore, not the DOM, so a cloned fold
+        // bar would be a dead "click to expand" with nothing behind it. The
+        // report gets the hidden rows inside a <details> instead, which
+        // opens with no script and prints closed.
+        clone.querySelectorAll('[data-fold]').forEach(bar => {
+          const hidden = foldStore[bar.dataset.fold];
+          if (hidden == null) return;
+          const details = document.createElement('details');
+          details.className = 'report-fold';
+          const summary = document.createElement('summary');
+          summary.className = bar.className;
+          summary.textContent = bar.textContent.replace(/ -- click to expand/, '');
+          details.appendChild(summary);
+          details.insertAdjacentHTML('beforeend', hidden);
+          bar.replaceWith(details);
+        });
         return clone.innerHTML;
       }
       // The report ships its own separate, light-forced copy of the diff
@@ -1832,9 +1995,11 @@
         // identifying the report, with the A/B labels as the detail line.
         const savedItem = currentSavedId ? saved.find(s => s.id === currentSavedId) : null;
         const reportTitle = savedItem ? savedItem.name : (labelA + ' vs ' + labelB);
-        const added = lastOps.filter(o => o.type === 'add').length;
-        const removed = lastOps.filter(o => o.type === 'del').length;
-        const unchanged = lastOps.filter(o => o.type === 'equal').length;
+        // Same counting rule as the on-page stats: ignored lines are not
+        // changes, so the report's banner agrees with what it shows.
+        const added = lastOps.filter(o => o.type === 'add' && !o.ignored).length;
+        const removed = lastOps.filter(o => o.type === 'del' && !o.ignored).length;
+        const unchanged = lastOps.filter(o => o.type === 'equal' || o.ignored).length;
         const inBase = baseModeActive();
         const bodyHtml = inBase ? reportBodyHtml(diffPanelsEl) : reportBodyHtml(diffOutput);
         const unifiedClass = viewMode === 'unified' ? ' diff-unified' : '';
@@ -1877,6 +2042,8 @@
   .diff-unified .diff-row.del .diff-marker { color:#c0392b; } .diff-unified .diff-row.add .diff-marker { color:#2e7d32; }
   .diff-unified .diff-lineno { flex:0 0 52px; }
   .diff-fold { padding:${layout.foldPadding}; text-align:center; color:#888; font-size:${layout.foldFontSize}; background:#f0f0f0; }
+  .report-fold > summary { cursor:pointer; list-style:none; } .report-fold > summary::-webkit-details-marker { display:none; }
+  .report-fold > summary:hover { color:#2e7d32; }
   .diff-empty { padding:30px 16px; text-align:center; color:#888; font-size:12px; }
   @media print { body { background:#fff; padding:0; } .report { box-shadow:none; border:none; max-width:100%; } }
 </style>
@@ -2108,18 +2275,19 @@
         }
         else if (event.key === '}' && !inField) { event.preventDefault(); jumpToBookmark(1); }
         else if (event.key === '{' && !inField) { event.preventDefault(); jumpToBookmark(-1); }
+        else if (event.key === '?' && !inField) { event.preventDefault(); openAbout(); }
         else if (event.key === 'Escape' && document.querySelector('.hunk-flash')) { dismissHunkFlash(); }
       });
 
       /* ── Mode toggle (Text Compare / Folder Compare) ─────────────── */
       const textModePanelEl = $('text-mode-panel'), folderModePanelEl = $('folder-mode-panel');
+      function setAppMode(mode) {
+        document.querySelectorAll('[data-app-mode]').forEach(b => b.classList.toggle('active', b.dataset.appMode === mode));
+        textModePanelEl.hidden = mode !== 'text';
+        folderModePanelEl.hidden = mode !== 'folder';
+      }
       document.querySelectorAll('[data-app-mode]').forEach(btn => {
-        btn.addEventListener('click', () => {
-          document.querySelectorAll('[data-app-mode]').forEach(b => b.classList.toggle('active', b === btn));
-          const mode = btn.dataset.appMode;
-          textModePanelEl.hidden = mode !== 'text';
-          folderModePanelEl.hidden = mode !== 'folder';
-        });
+        btn.addEventListener('click', () => setAppMode(btn.dataset.appMode));
       });
 
       /* ── Folder compare ───────────────────────────────────────────
@@ -2285,9 +2453,47 @@
         folderDiffEntries = entries;
         renderFolderSummary();
         folderFilterRowEl.hidden = false;
+        folderCopySummaryButton.hidden = false;
         renderFolderDiffList();
       }
       folderCompareButton.addEventListener('click', runFolderCompare);
+
+      // The list as currently filtered, as text: one line per file with
+      // the same +/-/~/= glyphs as the rows, for pasting into a ticket or
+      // a change record.
+      const folderCopySummaryButton = $('folder-copy-summary-button');
+      function filteredFolderEntries() {
+        return folderDiffEntries.filter(e => {
+          if (folderDiffFilter !== 'all' && e.status !== folderDiffFilter) return false;
+          if (folderSearchTerm && !e.path.toLowerCase().includes(folderSearchTerm)) return false;
+          return true;
+        });
+      }
+      function buildFolderSummaryText() {
+        const counts = { added: 0, removed: 0, modified: 0, unchanged: 0 };
+        folderDiffEntries.forEach(e => { counts[e.status]++; });
+        const lines = [
+          `Folder A: ${folderA.rootName}`,
+          `Folder B: ${folderB.rootName}`,
+          `${counts.added} added, ${counts.removed} removed, ${counts.modified} modified, ${counts.unchanged} unchanged`,
+        ];
+        const shown = filteredFolderEntries();
+        if (folderDiffFilter !== 'all' || folderSearchTerm) lines.push(`Showing ${shown.length} of ${folderDiffEntries.length} files` + (folderDiffFilter !== 'all' ? ` (${folderDiffFilter})` : '') + (folderSearchTerm ? ` matching "${folderSearchTerm}"` : ''));
+        lines.push('');
+        shown.forEach(e => {
+          const size = e.status === 'added' ? formatBytes(e.sizeB)
+            : e.status === 'removed' ? formatBytes(e.sizeA)
+            : e.status === 'modified' ? `${formatBytes(e.sizeA)} -> ${formatBytes(e.sizeB)}`
+            : formatBytes(e.sizeA);
+          lines.push(`${FOLDER_STATUS_GLYPH[e.status]} ${e.path}  (${size})`);
+        });
+        return lines.join('\n') + '\n';
+      }
+      folderCopySummaryButton.addEventListener('click', async () => {
+        if (!folderDiffEntries.length) { flash('Nothing to copy yet -- compare two folders first'); return; }
+        try { await navigator.clipboard.writeText(buildFolderSummaryText()); flash('Summary copied (' + filteredFolderEntries().length + ' files)'); }
+        catch (e) { flash('Copy failed'); }
+      });
 
       function renderFolderSummary() {
         const added = folderDiffEntries.filter(e => e.status === 'added').length;
@@ -2312,11 +2518,7 @@
       const FOLDER_STATUS_GLYPH = { added: '+', removed: '−', modified: '~', unchanged: '=' };
       function renderFolderDiffList() {
         collapseExpandedFolderRow(); // revoke any open image-diff object URLs before the DOM under them is discarded
-        const filtered = folderDiffEntries.filter(e => {
-          if (folderDiffFilter !== 'all' && e.status !== folderDiffFilter) return false;
-          if (folderSearchTerm && !e.path.toLowerCase().includes(folderSearchTerm)) return false;
-          return true;
-        });
+        const filtered = filteredFolderEntries();
         if (!filtered.length) { folderDiffListEl.innerHTML = '<div class="folder-diff-progress">No files match.</div>'; return; }
         folderDiffListEl.innerHTML = filtered.map(e => {
           const meta = e.status === 'added' ? formatBytes(e.sizeB)
@@ -2391,6 +2593,15 @@
             const ops = diffLinesDisplay(rawX, rawY, rawX, rawY);
             const outputEl = document.createElement('div');
             container.innerHTML = '';
+            const bar = document.createElement('div');
+            bar.className = 'folder-diff-row-detail-actions';
+            const sendBtn = document.createElement('button');
+            sendBtn.type = 'button'; sendBtn.className = 'button';
+            sendBtn.textContent = 'Open in Text Compare';
+            sendBtn.title = 'Load both versions of this file into Text Compare, with copy arrows, 3-way merge, and export';
+            sendBtn.addEventListener('click', () => sendFolderEntryToTextCompare(entry, textAContent, textBContent));
+            bar.appendChild(sendBtn);
+            container.appendChild(bar);
             container.appendChild(outputEl);
             renderDiffSection(ops, outputEl);
           } catch (e) {
@@ -2405,6 +2616,23 @@
         container.innerHTML = `<div class="folder-diff-row-detail-empty">Binary file changed - ${formatBytes(entry.sizeA)} → ${formatBytes(entry.sizeB)}.</div>`;
       }
 
+      // The pair goes in as a fresh, unsaved comparison titled by folder
+      // and path, so Save keeps it as its own tab if wanted.
+      function sendFolderEntryToTextCompare(entry, contentA, contentB) {
+        if (!confirmDiscardIfDirty('Opening "' + entry.path + '" in Text Compare')) return;
+        if (textA.value || textB.value || textBase.value) pushUndo();
+        currentSavedId = null;
+        savedFieldsToPanes({
+          textA: contentA, textB: contentB,
+          labelA: (folderA.rootName + '/' + entry.path).slice(0, 80), labelB: (folderB.rootName + '/' + entry.path).slice(0, 80),
+          textBase: '', labelBase: 'Base', baseShown: false,
+          lineEndingsA: detectLineEndings(contentA), lineEndingsB: detectLineEndings(contentB),
+        });
+        setAppMode('text');
+        renderSavedBar(); runCompare();
+        flash('Opened ' + entry.path + ' in Text Compare');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
       function loadImageEl(url) {
         return new Promise((resolve, reject) => {
           const img = new Image();
