@@ -1,0 +1,2 @@
+hostname CORE-SW1
+ntp server 10.20.0.10

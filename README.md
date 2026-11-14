@@ -1,4 +1,4 @@
-# Delta v1.2
+# Delta v1.3
 
 Delta is the local-first diff tool I wanted for comparing switch configs, firewall exports, and other text that should never be pasted into a website.
 
@@ -35,6 +35,8 @@ Or use it at [radmagelabs.com/delta/](https://radmagelabs.com/delta/), the same 
 
 Folder Compare needs a browser that supports picking a folder (current Chrome, Edge, and Firefox do).
 
+It also works on a phone or tablet: from 320px up the controls wrap to fit the screen and the two versions stack.
+
 ## Useful shortcuts
 
 | Shortcut | Action |
@@ -49,6 +51,10 @@ Folder Compare needs a browser that supports picking a folder (current Chrome, E
 | `}` / `{` | Jump to the next / previous bookmarked change |
 | `?` | Open the About dialog with the full feature and shortcut list |
 
+## Tests
+
+`node tests/run.mjs` runs the browser tests in headless Chrome or Edge (Node 22 or later; nothing to install). They check the security guarantees in three settings (served with no security policy, as GitHub Pages serves it; served with the headers radmagelabs.com sends; and the release zip opened from disk), with v1.1 as a known-vulnerable control the security tests must catch. They also cover Markdown rendering, layout from 320px to desktop, and everyday use. `--out DIR` keeps the layout screenshots. Set `CHROME_PATH` to use a particular browser.
+
 ## Third-party code
 
 Syntax highlighting uses [Prism.js](https://prismjs.com) (MIT License), vendored in `delta/vendor/prism/` with its license and never loaded from a CDN. Everything else is hand-written with no dependencies.
@@ -57,4 +63,4 @@ Syntax highlighting uses [Prism.js](https://prismjs.com) (MIT License), vendored
 
 MIT. See [`LICENSE`](LICENSE).
 
-The current release is **v1.2**. See [`CHANGELOG.md`](CHANGELOG.md) for what changed.
+The current release is **v1.3**. See [`CHANGELOG.md`](CHANGELOG.md) for what changed.

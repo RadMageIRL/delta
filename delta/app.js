@@ -421,21 +421,60 @@
           blocks.push('<pre><code>' + escMd(code.replace(/^\n/, '')) + '</code></pre>');
           return '\u0000BLOCK' + (blocks.length - 1) + '\u0000';
         });
-        function inline(s) {
-          s = escMd(s);
-          s = s.replace(/`([^`]+)`/g, '<code>$1</code>');
-          s = s.replace(/\*\*([^*]+)\*\*|__([^_]+)__/g, (m, a, b) => '<strong>' + (a || b) + '</strong>');
-          s = s.replace(/\*([^*]+)\*|_([^_]+)_/g, (m, a, b) => '<em>' + (a || b) + '</em>');
-          // An image from anywhere but a data: URL would be a network request, so it shows as
-          // its alt text instead.
-          s = s.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (m, alt, url) => /^data:image\//i.test(url.replace(/[\u0000-\u0020\u007f]+/g, ''))
-            ? '<img alt="' + alt + '" src="' + url + '">'
-            : '<span class="md-image-off" title="Not loaded: the preview only shows images stored in the text as data: URLs">[image' + (alt ? ': ' + alt : '') + ']</span>');
-          // A link with any other scheme (javascript:, data:, vbscript:...) keeps only its text.
-          s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (m, label, url) => ['', 'http', 'https', 'mailto'].includes(urlScheme(url))
-            ? '<a href="' + url + '" rel="noopener noreferrer">' + label + '</a>'
-            : label);
-          return s;
+        // Emphasis on text that is already escaped.
+        const emphasis = s => s
+          .replace(/\*\*([^*]+)\*\*|__([^_]+)__/g, (m, a, b) => '<strong>' + (a || b) + '</strong>')
+          .replace(/\*([^*]+)\*|_([^_]+)_/g, (m, a, b) => '<em>' + (a || b) + '</em>');
+        // Inline Markdown in passes, so formatting never reaches inside an address: code spans,
+        // then links and images, are set aside as placeholders (\x01 n \x02) before emphasis runs
+        // over what is left, and go back in at the end. Every piece of text is escaped once, as
+        // it is written out.
+        function inline(src) {
+          const held = [], heldText = [];
+          const hold = (html, text) => { held.push(html); heldText.push(text); return '\x01' + (held.length - 1) + '\x02'; };
+          const restore = (s, from) => { for (let i = 0; i < 4 && s.indexOf('\x01') >= 0; i++) s = s.replace(/\x01(\d+)\x02/g, (m, n) => from[+n]); return s; };
+          // The placeholder marks are control characters with no meaning in Markdown; any in the
+          // text itself are dropped so they can't be mistaken for one.
+          let s = src.replace(/[\x01\x02]/g, '');
+          s = s.replace(/`([^`]+)`/g, (m, code) => hold('<code>' + escMd(code) + '</code>', code));
+          s = replaceLinks(s, (isImage, label, url) => {
+            if (isImage) {
+              const alt = restore(label, heldText);
+              // An image from anywhere but a data: URL would be a network request, so it shows
+              // as its alt text instead.
+              return hold(/^data:image\//i.test(url.replace(/[\x00-\x20\x7f]+/g, ''))
+                ? '<img alt="' + escMd(alt) + '" src="' + escMd(url) + '">'
+                : '<span class="md-image-off" title="Not loaded: the preview only shows images stored in the text as data: URLs">[image' + (alt ? ': ' + escMd(alt) : '') + ']</span>', alt);
+            }
+            const text = emphasis(escMd(label));
+            // A link with any other scheme (javascript:, data:, vbscript:...) keeps only its text.
+            return hold(['', 'http', 'https', 'mailto'].includes(urlScheme(url))
+              ? '<a href="' + escMd(url) + '" rel="noopener noreferrer">' + text + '</a>'
+              : text, label);
+          });
+          return restore(emphasis(escMd(s)), held);
+        }
+        // Finds [label](address) and ![alt](address) and replaces each with fn(isImage, label,
+        // address). As in CommonMark, an address may hold balanced parentheses, as in
+        // https://en.wikipedia.org/wiki/Diff_(Unix), and ends at the first unbalanced ')'; a label
+        // is the text after the last '[' before its ']'. Anything that doesn't close stays text.
+        function replaceLinks(s, fn) {
+          let out = '', i = 0;
+          for (let close = s.indexOf('](', i); close >= 0; close = s.indexOf('](', i)) {
+            const open = s.lastIndexOf('[', close);
+            let depth = 0, end = -1;
+            for (let j = close + 2; j < s.length; j++) {
+              if (s[j] === '(') depth++;
+              else if (s[j] === ')') { if (depth === 0) { end = j; break; } depth--; }
+            }
+            const url = end >= 0 ? s.slice(close + 2, end).trim() : '';
+            const label = open >= i ? s.slice(open + 1, close) : '';
+            const isImage = open > i && s[open - 1] === '!';
+            if (open < i || end < 0 || !url || (!label && !isImage)) { out += s.slice(i, close + 2); i = close + 2; continue; }
+            out += s.slice(i, isImage ? open - 1 : open) + fn(isImage, label, url);
+            i = end + 1;
+          }
+          return out + s.slice(i);
         }
         let html = '', inUl = false, inOl = false, inQuote = false, para = [];
         const closeLists = () => { if (inUl) { html += '</ul>'; inUl = false; } if (inOl) { html += '</ol>'; inOl = false; } };

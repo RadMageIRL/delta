@@ -1,5 +1,22 @@
 # Changelog
 
+## v1.3 - 2026-11-14
+
+### Fixed
+
+- Delta fits phone screens. On a 320 to 390px screen the page was about 584px wide, so phones zoomed it out: the tagline never wrapped, and the Compare and View option groups were single rows that could not wrap. They wrap now, and from 320px up the page is never wider than the screen. Desktop layout is unchanged.
+- Where the side-by-side diff stacks (800px and narrower), each half now spans the full width. Before, every stacked line was squeezed into half the screen.
+- Markdown link and image addresses come out exactly as written. Underscores and asterisks inside an address were read as emphasis, so `https://example.com/a_b_c` became a broken link. Addresses may also hold balanced parentheses, as in `https://en.wikipedia.org/wiki/Diff_(Unix)`, and links and emphasis inside a code span stay plain text. The v1.2 rules are unchanged: a link keeps only an http, https, mailto, or relative address, every address is escaped, and an image shows only from a `data:` URL.
+
+### Changed
+
+- On touch screens, the saved-tab icons, the find arrows, the ignore-pattern field, and **expand all** are large enough to tap (the icon buttons 32px), and text fields use at least 16px text, which also keeps phones from zooming in when you start typing. On phones the editors start 300px tall instead of 460px, and can still be dragged taller. With a mouse, nothing changes.
+- A shorter page title for search results, and the structured data's description now matches the page description.
+
+### Added
+
+- `tests/`: browser tests with no dependencies, run with `node tests/run.mjs` (Node 22 or later and Chrome or Edge). They cover the v1.2 security guarantees in three settings (served without a security policy as on GitHub Pages, served with the radmagelabs.com headers, and the release zip opened from disk), with v1.1 as a known-vulnerable control; Markdown rendering; layout from 320px to desktop; and everyday use. Neither the release zip nor the GitHub Pages copy includes them.
+
 ## v1.2 - 2026-11-13
 
 ### Security

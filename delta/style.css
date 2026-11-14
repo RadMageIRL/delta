@@ -553,6 +553,9 @@
     @media (max-width: 800px) {
       .diff-inputs { grid-template-columns: 1fr; }
       .diff-row { flex-direction: column; }
+      /* Stacked, each half spans the row; the side-by-side 50% width would
+         leave every stacked line squeezed into half the screen. */
+      .diff-half { flex: 1 1 auto; width: 100%; }
       .diff-half + .diff-half { border-left: 0; border-top: 1px solid var(--border); }
       /* The copy-hunk arrows are centered on the seam between the two
          side-by-side columns; once .diff-row stacks them vertically above,
@@ -563,6 +566,42 @@
       .folder-pick-row { flex-direction: column; }
       .folder-image-diff { grid-template-columns: 1fr; }
       .merge-conflict-columns { grid-template-columns: 1fr; }
+      /* Narrow screens: three things kept their one-line width and made the
+         whole page about 584px wide on a phone (the browser then zoomed the
+         page out to fit). The tagline never wrapped, and the Compare and
+         View option groups were single rows that could not wrap, the
+         ignore-pattern box and the syntax menu at their ends. They wrap
+         now, so the page is never wider than the screen. Each only wraps
+         when it runs out of room, so nothing changes where it already fit. */
+      .brand { flex-wrap: wrap; row-gap: 4px; }
+      .tagline { white-space: normal; }
+      .option-group { flex-wrap: wrap; row-gap: 6px; }
+      .ignore-pattern-box { min-width: min(210px, 100%); }
+      .toast { max-width: calc(100vw - 32px); }
+    }
+    @media (max-width: 600px) {
+      /* Phones: a shorter editor, so both panes and the Compare button are
+         a couple of thumb scrolls apart instead of a page each. It can
+         still be dragged taller, and a saved pane height still applies. */
+      .pane textarea { min-height: 300px; }
+      /* The tagline gets its own line under the logo, with room left for the
+         saved indicator beside it, and the buttons line up under both. */
+      .tagline { flex: 1 1 calc(100% - 24px); }
+      .toolbar { justify-content: flex-start; }
+    }
+    /* Touch screens: controls that are smaller than a fingertip get room to
+       be tapped (at least 32px for the icon buttons), and fields where you
+       type use at least 16px text, which also keeps phones from zooming the
+       page in when a field is focused. A mouse-driven desktop is unchanged. */
+    @media (pointer: coarse) {
+      .saved-pin, .saved-rename, .saved-dup, .saved-remove { min-width: 32px; min-height: 32px; }
+      .pane-search-nav { width: 32px; height: 32px; font-size: 11px; }
+      .pane-search-input { max-width: calc(100% - 104px); }
+      .ignore-pattern-input { min-height: 32px; }
+      .ignore-pattern-chip-remove { min-width: 28px; min-height: 28px; }
+      .diff-stats .stats-action { display: inline-block; padding: 7px 2px; margin: -7px 0; }
+      .pane textarea, .merge-output-textarea { font-size: max(16px, var(--code-font-size)); }
+      .pane-title, .pane-search-input, .ignore-pattern-input, .folder-search-input, .saved-name-input { font-size: 16px; }
     }
 
     /* Printing the live page (as opposed to the separate "HTML Report"
