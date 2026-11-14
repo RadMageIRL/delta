@@ -1,5 +1,21 @@
 # Changelog
 
+## v1.2 - 2026-11-13
+
+### Security
+
+- Markdown preview could run script from the text being previewed. Quotes in link and image addresses were not escaped, so an address could add an event handler to the element, and links kept any scheme, including `javascript:`. Addresses are now fully escaped, and a link keeps only an http, https, mailto, or relative address; any other scheme leaves just its text.
+- Previews no longer load anything from the network. Pasted HTML could pull images, stylesheets, fonts, or media from other sites, and Markdown images loaded from their addresses, telling those sites the preview was opened. The HTML preview now carries its own Content-Security-Policy that allows only inline styles and `data:` URLs, and a Markdown image shows as `[image: alt text]` unless it is a `data:` URL.
+
+### Added
+
+- Delta also runs at [radmagelabs.com/delta/](https://radmagelabs.com/delta/). A workflow publishes the `delta/` folder to GitHub Pages on each push to `main` that changes it, and radmagelabs.com serves that copy with a Content-Security-Policy that blocks requests to other sites.
+- A page description, a canonical address, link-preview tags, and structured data for search, plus a RadMage Labs link in the tagline.
+
+### Changed
+
+- The script that applies a saved theme before first paint is now its own file, `theme.js`, instead of an inline script, so it still runs under that security policy.
+
 ## v1.1 - 2026-10-11
 
 ### Added

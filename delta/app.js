@@ -392,7 +392,12 @@
          tokens) iframe so pasted content can never execute script, and
          Markdown gets a small hand-rolled renderer covering the common
          subset (headers, emphasis, code, links, lists, blockquotes,
-         rules) rather than pulling in a library. ── */
+         rules) rather than pulling in a library. Neither preview fetches
+         anything: the HTML frame carries its own Content-Security-Policy
+         (inline styles and data: URLs only), and Markdown images render
+         only from data: URLs. Markdown links keep to http, https, mailto
+         and relative addresses, and every attribute value is escaped, so
+         pasted text can't add script through a link or an image. ── */
       function detectContentType(text) {
         const t = text.trim();
         if (!t) return 'plain';
@@ -400,8 +405,17 @@
         if (/^#{1,6}\s/m.test(t) || /^\s*[-*+]\s/m.test(t) || /^\s*\d+\.\s/m.test(t) || /\[[^\]]+\]\([^)]+\)/.test(t) || /^```/m.test(t)) return 'markdown';
         return 'plain';
       }
+      // The scheme of an address as a browser would read it: leading spaces and control
+      // characters are dropped, and tabs and newlines inside the scheme are ignored. Removing
+      // every space and control character is stricter still, which errs on the safe side.
+      // Returns '' for an address with no scheme (relative, #fragment, //host).
+      function urlScheme(url) {
+        const m = url.replace(/[\u0000-\u0020\u007f]+/g, '').match(/^([a-z][a-z0-9+.-]*):/i);
+        return m ? m[1].toLowerCase() : '';
+      }
       function markdownToHtml(src) {
-        const escMd = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        // Quotes are escaped too: link and image addresses land inside attribute values.
+        const escMd = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
         const blocks = [];
         const text = src.replace(/```([\s\S]*?)```/g, (m, code) => {
           blocks.push('<pre><code>' + escMd(code.replace(/^\n/, '')) + '</code></pre>');
@@ -412,8 +426,15 @@
           s = s.replace(/`([^`]+)`/g, '<code>$1</code>');
           s = s.replace(/\*\*([^*]+)\*\*|__([^_]+)__/g, (m, a, b) => '<strong>' + (a || b) + '</strong>');
           s = s.replace(/\*([^*]+)\*|_([^_]+)_/g, (m, a, b) => '<em>' + (a || b) + '</em>');
-          s = s.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img alt="$1" src="$2">');
-          s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" rel="noopener noreferrer">$1</a>');
+          // An image from anywhere but a data: URL would be a network request, so it shows as
+          // its alt text instead.
+          s = s.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (m, alt, url) => /^data:image\//i.test(url.replace(/[\u0000-\u0020\u007f]+/g, ''))
+            ? '<img alt="' + alt + '" src="' + url + '">'
+            : '<span class="md-image-off" title="Not loaded: the preview only shows images stored in the text as data: URLs">[image' + (alt ? ': ' + alt : '') + ']</span>');
+          // A link with any other scheme (javascript:, data:, vbscript:...) keeps only its text.
+          s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (m, label, url) => ['', 'http', 'https', 'mailto'].includes(urlScheme(url))
+            ? '<a href="' + url + '" rel="noopener noreferrer">' + label + '</a>'
+            : label);
           return s;
         }
         let html = '', inUl = false, inOl = false, inQuote = false, para = [];
@@ -950,6 +971,16 @@
         liveTimer = setTimeout(() => { if (textA.value && textB.value) runCompare(); }, 500);
       }
 
+      // sandbox="" already stops script in the HTML preview, but pasted HTML could still load
+      // images, stylesheets, fonts or media from other sites, telling them the page was opened.
+      // This policy goes first in the frame's document (after a doctype, so the page keeps its
+      // rendering mode) and allows only inline styles and data: URLs. Policies only add up, so
+      // nothing in the pasted HTML can loosen it.
+      const PREVIEW_POLICY = '<meta http-equiv="Content-Security-Policy" content="default-src \'none\'; style-src \'unsafe-inline\'; img-src data:; font-src data:; media-src data:; base-uri \'none\'; form-action \'none\'">';
+      function withPreviewPolicy(html) {
+        const doctype = html.match(/^\s*<!doctype[^>]*>/i);
+        return doctype ? doctype[0] + PREVIEW_POLICY + html.slice(doctype[0].length) : PREVIEW_POLICY + html;
+      }
       function renderPreviewSide(container, badgeEl, text) {
         const type = detectContentType(text);
         badgeEl.textContent = type === 'html' ? 'HTML' : type === 'markdown' ? 'Markdown' : 'Plain text';
@@ -960,7 +991,7 @@
           iframe.className = 'preview-frame';
           iframe.setAttribute('sandbox', '');
           container.appendChild(iframe);
-          iframe.srcdoc = text;
+          iframe.srcdoc = withPreviewPolicy(text);
         } else if (type === 'markdown') {
           const div = document.createElement('div');
           div.className = 'preview-markdown';

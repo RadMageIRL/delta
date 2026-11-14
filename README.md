@@ -1,4 +1,4 @@
-# Delta v1.1
+# Delta v1.2
 
 Delta is the local-first diff tool I wanted for comparing switch configs, firewall exports, and other text that should never be pasted into a website.
 
@@ -17,7 +17,7 @@ That storage is the only copy, so use **Export** now and then to keep a JSON bac
 - Copy-to-other-side arrows on each change in Split view, with undo
 - A change count next to the added and removed line counts, and an **expand all** link that opens every folded run of unchanged lines
 - `]` / `[` change navigation, bookmarks on changes, and per-pane find
-- **Live** mode (re-compare as you stop typing) and **Preview** mode (render HTML or Markdown)
+- **Live** mode (re-compare as you stop typing) and **Preview** mode (render HTML or Markdown, without loading anything from the network)
 - **Whitespace** toggle that shows every space and tab
 - Optional syntax highlighting for JS/TS, Python, JSON, CSS, HTML/XML, Bash, SQL, YAML, Go, Rust, Java, C#, C/C++, and Markdown
 - **Folder Compare**: pick two local folders and see every file as added, removed, modified, or unchanged by SHA-256 content hash; modified text files open in the same diff view, with an **Open in Text Compare** button for copy arrows, merge, and export; modified images get a pixel-difference overlay; **Copy Summary** copies the file list as text
@@ -30,6 +30,8 @@ That storage is the only copy, so use **Export** now and then to keep a JSON bac
 ## Run it
 
 Download or clone this repository, then open `delta/index.html` directly in a modern browser. There is no install step and no server to run.
+
+Or use it at [radmagelabs.com/delta/](https://radmagelabs.com/delta/), the same page served as static files. Comparisons still never leave the browser: a share link keeps its comparison after the `#`, which browsers don't send to the server, and radmagelabs.com serves the page with a security policy that blocks requests to other sites. Saved comparisons belong to the address they were made at, so the hosted copy and a downloaded copy keep separate lists; **Export** and **Import** move them from one to the other.
 
 Folder Compare needs a browser that supports picking a folder (current Chrome, Edge, and Firefox do).
 
@@ -55,4 +57,4 @@ Syntax highlighting uses [Prism.js](https://prismjs.com) (MIT License), vendored
 
 MIT. See [`LICENSE`](LICENSE).
 
-The current release is **v1.1**. See [`CHANGELOG.md`](CHANGELOG.md) for what changed.
+The current release is **v1.2**. See [`CHANGELOG.md`](CHANGELOG.md) for what changed.

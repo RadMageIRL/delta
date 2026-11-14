@@ -1,0 +1,45 @@
+# Publishes the delta/ folder to GitHub Pages, where radmagelabs.com/delta/ proxies it.
+# It runs on a push to main that changes delta/ (or this file), and by hand from the Actions
+# tab or with `gh workflow run pages.yml`. Needs the repo's Pages source set to "GitHub Actions".
+# There is no build step: the files deployed are the files in delta/ at that commit.
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'delta/**'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      # Compare with a local `cd delta && sha256sum` of every file to confirm what was deployed.
+      - name: SHA-256 of every deployed file
+        run: cd delta && find . -type f | LC_ALL=C sort | xargs sha256sum
+      - uses: actions/configure-pages@v6
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: delta
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5
